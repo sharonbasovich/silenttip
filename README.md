@@ -43,6 +43,14 @@ The four tabs walk the demo end to end:
 To run the flow for real: generate a sender wallet in the Tip tab, fund it from
 a public signet faucet (e.g. signetfaucet.com), then send a tip and scan.
 
+## Demo assets
+
+- `docs/demo.mp4` — ~90 s walkthrough: identity → Nostr publish → npub
+  resolution → on-chain inspection → block scan.
+- `docs/screenshots/` — stills of each step.
+- `docs/evidence.md` — what is verified and what is not (read before judging).
+- `docs/devfolio-draft.md` — submission copy draft.
+
 ## Architecture
 
 ```
