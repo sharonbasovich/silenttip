@@ -27,36 +27,6 @@ function isCompressedPubKey(b: Uint8Array): boolean {
   return b.length === 33 && (b[0] === 0x02 || b[0] === 0x03);
 }
 
-/** Parse a script into raw push data; non-push opcodes are skipped. */
-function parsePushes(script: Uint8Array): Uint8Array[] {
-  const out: Uint8Array[] = [];
-  let i = 0;
-  while (i < script.length) {
-    const op = script[i++];
-    let len: number;
-    if (op <= 0x4b) {
-      len = op;
-    } else if (op === 0x4c) {
-      len = script[i++] ?? 0;
-    } else if (op === 0x4d) {
-      len = (script[i] ?? 0) | ((script[i + 1] ?? 0) << 8);
-      i += 2;
-    } else if (op === 0x4e) {
-      len =
-        (script[i] ?? 0) |
-        ((script[i + 1] ?? 0) << 8) |
-        ((script[i + 2] ?? 0) << 16) |
-        ((script[i + 3] ?? 0) << 24);
-      i += 4;
-    } else {
-      continue; // opcode, not a push
-    }
-    out.push(script.subarray(i, Math.min(i + len, script.length)));
-    i += len;
-  }
-  return out;
-}
-
 function keyHashMatch(candidate: Uint8Array, program: Uint8Array): boolean {
   if (!isCompressedPubKey(candidate)) return false;
   const h = hash160(candidate);
@@ -71,19 +41,14 @@ function keyHashMatch(candidate: Uint8Array, program: Uint8Array): boolean {
  * spends. Returns the 33-byte compressed key 02||x, or null when skipped.
  */
 function trInputKey(witness: Uint8Array[], prevoutX: Uint8Array): Uint8Array | null {
-  if (witness.length > 1) {
-    let cbIndex = witness.length - 1;
-    const last = witness[cbIndex];
-    if (last.length > 0 && last[0] === 0x50 && witness.length > 2) {
-      cbIndex -= 1; // annex present
-    }
-    const cb = witness[cbIndex];
-    const isControlBlock =
-      cb.length >= 33 && (cb.length - 33) % 32 === 0 && (cb[0] & 0xfe) === 0xc0;
-    if (isControlBlock) {
-      const internalX = cb.subarray(1, 33);
-      if (toHex(internalX) === NUMS_H_X) return null;
-    }
+  const stack = [...witness];
+  const top = stack[stack.length - 1];
+  if (stack.length > 1 && top.length > 0 && top[0] === 0x50) stack.pop(); // annex
+  if (stack.length > 1) {
+    // Script-path spend: last item is the control block, bytes 1:33 are the
+    // internal key. If it is the NUMS point H the input is skipped (BIP-352).
+    const internalX = stack[stack.length - 1].subarray(1, 33);
+    if (toHex(internalX) === NUMS_H_X) return null;
   }
   const key = new Uint8Array(33);
   key[0] = 0x02;
@@ -101,10 +66,9 @@ function trInputKey(witness: Uint8Array[], prevoutX: Uint8Array): Uint8Array | n
  *   v0_p2wpkh   — last witness item, hash160-checked against the program
  *   p2sh-p2wpkh — scriptSig must be exactly the p2wpkh redeem push; pubkey
  *                 is the last witness item, hash160-checked
- *   p2pkh       — first scriptSig push whose hash160 equals the prevout hash
- *                 (malleation-tolerant per BIP-352)
- *   p2pk        — compressed pubkey in the prevout scriptPubKey
- * Only compressed keys are permitted.
+ *   p2pkh       — a 33-byte window of the scriptSig whose hash160 equals the
+ *                 prevout hash (malleation-tolerant per BIP-352)
+ * Only compressed keys are permitted. Bare P2PK is NOT an eligible input type.
  */
 export function extractInputPubKey(
   scriptSigHex: string,
@@ -140,7 +104,9 @@ export function extractInputPubKey(
     return pk && keyHashMatch(pk, scriptSig.subarray(3)) ? pk : null;
   }
 
-  // P2PKH: find the pushed pubkey whose hash160 matches the prevout hash
+  // P2PKH: slide a 33-byte window over the scriptSig; the slice hashing to
+  // the prevout hash is the pubkey (tolerates non-standard/malleated
+  // scriptSigs exactly like the BIP-352 reference implementation).
   if (
     prevout.length === 25 &&
     prevout[0] === 0x76 &&
@@ -150,20 +116,11 @@ export function extractInputPubKey(
     prevout[24] === 0xac
   ) {
     const target = prevout.subarray(3, 23);
-    for (const push of parsePushes(scriptSig)) {
-      if (keyHashMatch(push, target)) return push;
+    for (let i = scriptSig.length; i - 33 >= 0; i--) {
+      const candidate = scriptSig.subarray(i - 33, i);
+      if (keyHashMatch(candidate, target)) return candidate;
     }
     return null;
-  }
-
-  // P2PK: <compressed-pubkey> OP_CHECKSIG
-  if (
-    prevout.length === 35 &&
-    prevout[0] === 0x21 &&
-    prevout[34] === 0xac &&
-    isCompressedPubKey(prevout.subarray(1, 34))
-  ) {
-    return prevout.subarray(1, 34);
   }
 
   return null;
@@ -243,19 +200,36 @@ export interface ScanMatch {
   tweak: string;
 }
 
+/** True when the scriptPubKey is a segwit output with version > 1. */
+function isSegwitV2Plus(scriptHex: string): boolean {
+  const spk = hex(scriptHex);
+  // OP_2..OP_16 push a 2..40-byte program
+  return (
+    spk.length >= 4 &&
+    spk.length <= 42 &&
+    spk[0] >= 0x52 &&
+    spk[0] <= 0x60 &&
+    spk[1] === spk.length - 2
+  );
+}
+
 /** Scan one transaction's P2TR outputs. Returns matches for our keys. */
 export function scanTransaction(
   tx: EsploraTx,
   scanPrivKey: Uint8Array,
   spendPubKey: Uint8Array,
 ): ScanMatch[] {
-  const inputs = tx.vin
-    .filter((vin) => !vin.is_coinbase && vin.prevout)
-    .map((vin) => ({
-      scriptSigHex: vin.scriptsig,
-      witnessHexes: vin.witness ?? [],
-      prevoutScriptHex: vin.prevout!.scriptpubkey,
-    }));
+  const spendableVins = tx.vin.filter((vin) => !vin.is_coinbase && vin.prevout);
+  // BIP-352: a transaction spending any segwit version > 1 output is skipped
+  // entirely — an unknown input type could follow rules we can't reproduce.
+  if (spendableVins.some((vin) => isSegwitV2Plus(vin.prevout!.scriptpubkey))) {
+    return [];
+  }
+  const inputs = spendableVins.map((vin) => ({
+    scriptSigHex: vin.scriptsig,
+    witnessHexes: vin.witness ?? [],
+    prevoutScriptHex: vin.prevout!.scriptpubkey,
+  }));
   const sum = sumInputPubKeys(inputs);
   if (!sum) return [];
 
