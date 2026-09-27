@@ -25,9 +25,12 @@
   },
   "devDependencies": {
     "eslint": "9.39.5",
+    "events": "^3.3.0",
     "typescript": "5.9.3",
     "typescript-eslint": "8.46.1",
+    "util": "^0.12.5",
     "vite": "7.3.6",
+    "vite-plugin-node-polyfills": "^0.28.0",
     "vitest": "4.1.11"
   }
 }
