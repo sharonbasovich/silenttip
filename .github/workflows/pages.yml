@@ -22,15 +22,30 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
+      - id: check
+        # GitHub Pages must be enabled (Settings → Pages → GitHub Actions).
+        # Skip cleanly instead of failing until it is.
+        run: |
+          code=$(curl -s -o /dev/null -w '%{http_code}' \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            "${{ github.api_url }}/repos/${{ github.repository }}/pages")
+          echo "enabled=$([ "$code" = "200" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          [ "$code" = "200" ] || echo "::notice::GitHub Pages not enabled — skipping deploy"
       - uses: actions/setup-node@v4
+        if: steps.check.outputs.enabled == 'true'
         with:
           node-version: 22
           cache: npm
       - run: npm ci --legacy-peer-deps
+        if: steps.check.outputs.enabled == 'true'
       - run: npm run build
+        if: steps.check.outputs.enabled == 'true'
       - uses: actions/configure-pages@v5
+        if: steps.check.outputs.enabled == 'true'
       - uses: actions/upload-pages-artifact@v3
+        if: steps.check.outputs.enabled == 'true'
         with:
           path: dist
       - id: deployment
         uses: actions/deploy-pages@v4
+        if: steps.check.outputs.enabled == 'true'
