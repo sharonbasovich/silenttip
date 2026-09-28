@@ -94,8 +94,16 @@ Every reputable public signet faucet was tried and is gated (latest pass
 - `signetfaucet.com` — Pterodactyl login panel.
 - `mempool.space/signet` — no public faucet-claim API.
 - `faucet.bitcoincoding.dev` — connection timeout from this network.
-- `arkfaucet.com` / `signet.2nd.dev` Ark rails / Mutinynet / Bublina —
-  Ark addresses or custom signets only, not default signet tb1q payouts.
+- `arkfaucet.com` — its `/agents/` API documents an `onchain` rail for
+  default-signet tb1q addresses. On 2026-09-28 one claim (1500 sats) was
+  made via `POST /api/request` and queued (202 pending), but the faucet's
+  own payout then failed server-side: `{"status":"failed","code":
+  "send_failed","error":"faucet send failed"}`. Verified independently via
+  Esplora: the address has 0 UTXOs on chain and in mempool; the faucet's
+  onchain budget was not consumed. Per the one-claim cap this was not
+  retried.
+- `signet.2nd.dev` Ark rails / Mutinynet / Bublina — Ark addresses or
+  custom signets only, not default signet tb1q payouts.
 
 The full pipeline — funding check, silent tip construction, broadcast, and
 receiver-side scan — is implemented in `scripts/signet-e2e.ts` and in the UI
