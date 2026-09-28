@@ -45,6 +45,9 @@ The app is deployed on GitHub Pages and was exercised live:
   binding `tsp1qq0nekn7ye8ckm9d7unfl9c8w5vqcaup0m2quphwa8r6kfs3c6xs76quvrz2zt43zcmqtgyas9zzjm40800nhkddv88n0drz636awdxvv0yprxu3l`.
   The Tip tab re-resolved this npub to the same tsp1 address with a valid
   schnorr signature.
+- **Two more bindings published from the hosted site on 2026-09-28** (visible
+  in the `video.html` walkthrough): `252f504ff529dd5d…` (3/3 relays) and
+  `4b7c717b8e55b832…` (damus.io + primal; nos.lol timed out).
 
 ## 2. Nostr binding — a real, verifiable event on public relays
 
