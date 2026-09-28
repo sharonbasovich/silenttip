@@ -85,9 +85,10 @@ creator, the sender, or any other tip to the same address.
 
 - Repo: https://github.com/sharonbasovich/silenttip
 - Live demo: https://sharonbasovich.github.io/silenttip/
+- Video walkthrough (hosted): https://sharonbasovich.github.io/silenttip/video.html
 - Evidence: `docs/evidence.md` — verified claims only
+- Judge notes (Cypherpunk self-audit): `docs/judge-notes.md`
 - Screenshots: `docs/screenshots/`
-- Video walkthrough: `docs/demo.mp4`
 
 ## Disclosure
 

@@ -28,6 +28,7 @@ header.hero { text-align: center; padding: 24px 8px 8px; }
 header.hero h1 { margin: 0; font-size: 1.9rem; letter-spacing: 0.5px; }
 header.hero h1 .accent { color: var(--accent); }
 header.hero p.tagline { color: var(--muted); margin: 8px auto 0; max-width: 56ch; }
+header.hero p.tagline.links { font-size: 0.85rem; }
 .badge {
   display: inline-block; font-size: 0.72rem; font-weight: 600; letter-spacing: 0.6px;
   text-transform: uppercase; color: #111; background: var(--accent-2);

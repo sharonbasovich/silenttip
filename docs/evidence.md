@@ -79,9 +79,20 @@ uses `1ce23d5182f645431126379781cafb73a61bcad6e2188883ec526c0fc51030f9`
 
 A broadcast signet transaction is only claimed when it exists on-chain.
 As of this writing the throwaway sender wallet
-(`tb1qreve5pu58jj7y8gej3akgfsse2vnfw6xhf6q2j`) is unfunded: every public
-signet faucet was either behind a login, a CAPTCHA that blocks automated
-browsers, or down, at demo-build time.
+(`tb1qreve5pu58jj7y8gej3akgfsse2vnfw6xhf6q2j`) is unfunded.
+
+Every reputable public signet faucet was tried and is gated (latest pass
+2026-09-28):
+
+- `bitcoinsignetfaucet.com` — funded and broadcasting, but its Cloudflare
+  Turnstile rejects the automated VM browser ("Verification failed", 3 tries).
+- `signet.2nd.dev` — on-chain payouts exist (`/api/v1/faucet/pay`) but now
+  require GitHub OAuth sign-in; no account creation permitted.
+- `signetfaucet.com` — Pterodactyl login panel.
+- `mempool.space/signet` — no public faucet-claim API.
+- `faucet.bitcoincoding.dev` — connection timeout from this network.
+- `arkfaucet.com` / `signet.2nd.dev` Ark rails / Mutinynet / Bublina —
+  Ark addresses or custom signets only, not default signet tb1q payouts.
 
 The full pipeline — funding check, silent tip construction, broadcast, and
 receiver-side scan — is implemented in `scripts/signet-e2e.ts` and in the UI

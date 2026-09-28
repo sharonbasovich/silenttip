@@ -25,6 +25,10 @@ app.append(
     el('h1', {}, el('span', { class: 'accent' }, 'Silent'), 'Tip'),
     el('p', { class: 'tagline' },
       'Put one static address in your Nostr profile and get paid on-chain forever — without a single payment ever linking back to you. BIP-352 silent payments, verified in your browser.'),
+    el('p', { class: 'tagline links' },
+      el('a', { href: './video.html' }, 'Watch the 90-second demo'), ' · ',
+      el('a', { href: 'https://github.com/sharonbasovich/silenttip', target: '_blank', rel: 'noopener' }, 'Source'), ' · ',
+      el('a', { href: 'https://github.com/sharonbasovich/silenttip/blob/main/docs/evidence.md', target: '_blank', rel: 'noopener' }, 'Verified evidence')),
   ),
 );
 

@@ -21,7 +21,8 @@ visible to judges in one click.
 > **Signet only.** SilentTip never touches mainnet keys, real funds, or paid
 > services. All keys are throwaway test keys generated in your browser.
 
-**Live demo:** https://sharonbasovich.github.io/silenttip/
+**Live demo:** https://sharonbasovich.github.io/silenttip/ ·
+**90-second video:** https://sharonbasovich.github.io/silenttip/video.html
 
 ## Try it
 
@@ -47,10 +48,12 @@ a public signet faucet (e.g. signetfaucet.com), then send a tip and scan.
 
 ## Demo assets
 
-- `docs/demo.mp4` — ~90 s walkthrough: identity → Nostr publish → npub
-  resolution → on-chain inspection → block scan.
+- `video.html` + `public/demo.mp4` — judge-readable video page (deployed at
+  `/silenttip/video.html`) embedding the ~90 s walkthrough: identity → Nostr
+  publish → npub resolution → on-chain inspection → block scan.
 - `docs/screenshots/` — stills of each step.
 - `docs/evidence.md` — what is verified and what is not (read before judging).
+- `docs/judge-notes.md` — Cypherpunk-track self-audit of the hook/story.
 - `docs/devfolio-draft.md` — submission copy draft.
 
 ## Architecture
