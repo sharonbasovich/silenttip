@@ -21,6 +21,8 @@ visible to judges in one click.
 > **Signet only.** SilentTip never touches mainnet keys, real funds, or paid
 > services. All keys are throwaway test keys generated in your browser.
 
+**Live demo:** https://sharonbasovich.github.io/silenttip/
+
 ## Try it
 
 ```bash

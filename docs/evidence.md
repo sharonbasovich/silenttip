@@ -30,6 +30,22 @@ cd silenttip && npm ci --legacy-peer-deps
 npm test
 ```
 
+## 1b. Hosted demo — verified end to end
+
+The app is deployed on GitHub Pages and was exercised live:
+
+- **URL:** https://sharonbasovich.github.io/silenttip/ (deployed by
+  `.github/workflows/pages.yml`, run 36377757882)
+- On the deployed site: generated a BIP-352 identity, published a binding,
+  resolved the resulting npub (signature verified), ran a 1-block scan via
+  Esplora, and inspected a real signet transaction — zero console errors.
+- **Binding event published from the hosted site:**
+  `3a6e4460e1dfea21…` (kind 30078, `d`=`silenttip`), accepted by all
+  three relays; author `npub18lc3g88l79s5ef20duxerpmchgmfyem665fyw5xucxetl540uxgqsq9kmx`,
+  binding `tsp1qq0nekn7ye8ckm9d7unfl9c8w5vqcaup0m2quphwa8r6kfs3c6xs76quvrz2zt43zcmqtgyas9zzjm40800nhkddv88n0drz636awdxvv0yprxu3l`.
+  The Tip tab re-resolved this npub to the same tsp1 address with a valid
+  schnorr signature.
+
 ## 2. Nostr binding — a real, verifiable event on public relays
 
 A kind-30078 (NIP-78 parameterized replaceable) event with `d` tag

@@ -32,13 +32,13 @@ creator, the sender, or any other tip to the same address.
   with a signed kind-30078 Nostr event.
 - **Tip:** paste a creator's npub — SilentTip fetches the binding from relays,
   verifies the signature, and builds a signet transaction paying a fresh
-  silent output. Optionally send a *static-address* tip to the same person to
-  build the comparison cluster.
+  silent output. Optionally send a *static-address* tip back to your own
+  wallet — the reused address is what a chain analyst clusters on.
 - **Scan:** the receiver's browser downloads recent signet blocks and runs
   the BIP-352 ECDH scan locally — no server ever learns the address.
-- **What the chain sees:** a side-by-side view of reused vs. silent outputs,
-  straight from mempool.space's signet API, so judges can see that nothing
-  on-chain links a tip to the npub it was sent to.
+- **What the chain sees:** renders the outputs of each tip transaction
+  straight from mempool.space's signet API — reused static outputs cluster
+  visibly, every silent tip is a fresh unlinked taproot key.
 
 ## How it's built
 
@@ -84,9 +84,10 @@ creator, the sender, or any other tip to the same address.
 ## Demo / links
 
 - Repo: https://github.com/sharonbasovich/silenttip
+- Live demo: https://sharonbasovich.github.io/silenttip/
 - Evidence: `docs/evidence.md` — verified claims only
 - Screenshots: `docs/screenshots/`
-- Live demo: <deployment URL — fill in once hosted>
+- Video walkthrough: `docs/demo.mp4`
 
 ## Disclosure
 

@@ -169,7 +169,6 @@ export function renderTip(root: HTMLElement): void {
       if (staticChk.checked) {
         // honest comparison: a normal tip to the sender's own static address
         const txHex = buildStaticTipTx(wallet, utxos, sats, rate);
-        void 0;
         const txid = await broadcastTx(txHex);
         addSentTip({ txid, kind: 'static', amountSats: sats, to: wallet.address, at: Date.now() });
         utxos = await getAddressUtxos(wallet.address);
