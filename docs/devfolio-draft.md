@@ -54,7 +54,9 @@ creator, the sender, or any other tip to the same address.
 - Pure static site (Vite + TypeScript) — no server, no custody, every crypto
   step runs in the browser tab.
 - `scripts/signet-e2e.ts` runs the same pipeline headlessly for CI-grade
-  end-to-end verification.
+  end-to-end verification; `scripts/regtest-e2e.ts` proves the identical
+  send → broadcast → receiver-scan path on a local regtest bitcoind
+  (recorded in `public/regtest-proof.mp4`, replayed in `test/regtest.test.ts`).
 
 ## Challenges we ran into
 
@@ -64,8 +66,10 @@ creator, the sender, or any other tip to the same address.
   input filtering. We kept its tagged-hash/codec helpers and reimplemented
   the ECDH/output/scan loops against `bitcoin/bips` `reference.py`.
 - **Signet is easy to describe and hard to fund.** Every public faucet was
-  login-, CAPTCHA-, or Cloudflare-gated during the build, so the live
-  broadcast is wired end-to-end but gated on a human faucet run —
+  login-, CAPTCHA-, or Cloudflare-gated during the build, so we proved the
+  identical broadcast pipeline on a local regtest chain
+  (`scripts/regtest-proof.json` + 24 s screencast, honestly labeled) and
+  left the signet broadcast gated on a human faucet run —
   `docs/evidence.md` states this explicitly rather than papering over it.
 - **Scanning is expensive.** A receiver must trial-decrypt every taproot
   output in range; we scoped the demo to recent blocks and made the cost

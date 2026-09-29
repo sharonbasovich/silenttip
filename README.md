@@ -44,13 +44,19 @@ The four tabs walk the demo end to end:
 | **Chain view** | Render what a chain analyst would see: silent-tip outputs are fresh unlinked P2TR keys; a static tip visibly clusters with the sender. |
 
 To run the flow for real: generate a sender wallet in the Tip tab, fund it from
-a public signet faucet (e.g. signetfaucet.com), then send a tip and scan.
+a public signet faucet, then send a tip and scan. (Public faucets are
+captcha/login-gated; the identical pipeline is proven end-to-end on local
+regtest — see `docs/evidence.md` §4b.)
 
 ## Demo assets
 
 - `video.html` + `public/demo.mp4` — judge-readable video page (deployed at
   `/silenttip/video.html`) embedding the ~90 s walkthrough: identity → Nostr
   publish → npub resolution → on-chain inspection → block scan.
+- `public/regtest-proof.mp4` + `scripts/regtest-proof.json` — 24 s screencast
+  and fixture of the full send → broadcast → receiver-scan run on a local
+  regtest bitcoind (`scripts/regtest-e2e.ts`; disposable keys/coins only,
+  honestly labeled regtest — the signet broadcast is still faucet-blocked).
 - `docs/screenshots/` — stills of each step.
 - `docs/evidence.md` — what is verified and what is not (read before judging).
 - `docs/judge-notes.md` — Cypherpunk-track self-audit of the hook/story.

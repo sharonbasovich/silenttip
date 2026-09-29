@@ -114,6 +114,32 @@ its txid will be recorded here. Until then the honest status is:
 **crypto proven on all 28 official vectors; live signet broadcast pending
 funding.**
 
+## 4b. Broadcast proof on local regtest — VERIFIED (not signet)
+
+To prove the exact send → broadcast → scan path end to end without a faucet,
+the same code ran against a local `bitcoind -regtest` node
+(`scripts/regtest-e2e.ts`, disposable throwaway keys and regtest coins only —
+nothing of value, nothing on a public network):
+
+- **Funded** the throwaway sender key by mining 101 regtest blocks to the
+  `bcrt1` address spending to the same key as `tb1qreve…` (regtest HRP).
+- **Built** a BIP-352 silent tip with the repo's own `buildSilentTipTx`:
+  5000 sats to `tsp1qqfjjuye…`, fee 153 sats.
+- **Broadcast** via `sendrawtransaction` and mined it into regtest
+  **block 103**: txid `44e2677292eff91f5428737d7702d4c7c5238be6121f86434631c80e54616beb`.
+- **Receiver scan** of that block with the repo's own `scanTransaction`
+  found exactly one match — vout 0, 5000 sats — and `(spendPriv + tweak)·G`
+  reproduced the output key, i.e. the receiver can spend it.
+- Screencast of the run: `public/regtest-proof.mp4` (24 s); the committed
+  fixture `scripts/regtest-proof.json` is replayed by `test/regtest.test.ts`
+  so CI re-verifies the scan and tweak math on every run.
+- Reproduce: `node scripts/dist/regtest-e2e.mjs run` against any
+  `bitcoin/bitcoin` regtest container (see the script header).
+
+**This is a regtest proof of the identical code path — it is NOT claimed to
+be a signet broadcast.** Section 4 above still applies: a signet txid is
+still pending faucet funding.
+
 ## 5. What is deliberately not claimed
 
 - No mainnet keys, transactions, or funds anywhere.

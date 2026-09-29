@@ -64,7 +64,7 @@
         <ol class="beats">
           <li><b>Receive</b> — generate a silent-payment identity (scan + spend keys, browser-side) and publish it as a signed Nostr event (<code>kind 30078</code>, <code>d=silenttip</code>) that public relays accept.</li>
           <li><b>Tip</b> — paste the creator's <code>npub</code>; the app resolves the binding live, verifies the schnorr signature, and derives the BIP-352 output key (<code>P = B_spend + hash(input_hash·a·B_scan‖k)·G</code>).</li>
-          <li><b>What the chain sees</b> — inspect a real signet transaction: a silent tip output is indistinguishable from any other taproot key — nothing links it to the reusable address.</li>
+          <li><b>What the chain sees</b> — inspect any real signet transaction's outputs: a silent tip is just another x-only taproot key — nothing links it to the reusable address. (The tx shown is an unrelated signet tx, presented as what a tip looks like, not claimed to be one.)</li>
           <li><b>Scan</b> — the receiver's scan key walks signet blocks via Esplora and recomputes candidate outputs; only their keys reveal which outputs are theirs.</li>
         </ol>
       </div>
@@ -79,12 +79,14 @@
       </div>
 
       <p class="note">
-        <b>Honest status:</b> identity generation, Nostr publish/resolve, output derivation, chain
-        inspection, and block scanning are all verified live. Broadcasting a funded silent tip is blocked
-        only by public signet faucets being captcha/login-gated — see
+        <b>Broadcast proof on local regtest (24 s):</b> the same code path — build, broadcast,
+        mine, receiver scan — runs end to end on a disposable regtest chain below. On public
+        signet, broadcasting is still blocked only by captcha/login-gated faucets — see
         <a href="https://github.com/sharonbasovich/silenttip/blob/main/docs/evidence.md">docs/evidence.md</a>
         for the exact, verifiable record of what has and has not been broadcast.
       </p>
+
+      <video controls playsinline preload="metadata" src="./regtest-proof.mp4"></video>
 
       <footer>
         <a href="./index.html">Try the live app</a> ·

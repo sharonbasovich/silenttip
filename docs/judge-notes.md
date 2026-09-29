@@ -55,13 +55,16 @@ unlinked — so the privacy claim is observable, not rhetorical.
   filtering — see `README.md#why-a-local-outputsts`).
 - **Honest evidence** — `docs/evidence.md` records exactly what was verified
   (Nostr publish/resolve live on public relays, full spec compliance,
-  real signet inspection) and what is not yet (a *broadcast* funded tip —
-  blocked only by faucet captcha gating, pending one human faucet run).
+  real signet inspection, and a real send → broadcast → receiver-scan run
+  on a local regtest chain) and what is not yet (a broadcast funded tip
+  *on public signet* — blocked only by faucet captcha gating, pending one
+  human faucet run).
 
 ## Known weaknesses (no hiding)
 
-- A broadcast silent tip is not yet on signet — the end-to-end path is built
-  and vector-verified, but the throwaway wallet needs ~10k faucet sats that
+- A broadcast silent tip is verified on local **regtest** (disposable coins,
+  identical code path — `scripts/regtest-proof.json`, 24 s screencast) but
+  not yet on **signet**: the throwaway wallet needs ~10k faucet sats that
   require a human behind a captcha. We state this rather than simulate it.
 - Full-chain scanning is expensive; the demo caps at 40 blocks and says so.
 - Sender privacy is out of scope — the sender's P2WPKH input reveals *who*
