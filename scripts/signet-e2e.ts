@@ -13,6 +13,7 @@
  */
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { generateIdentity, toHex, fromHex } from '../src/sp/keys';
+import { newNostrTestKey, signBinding, publishEvent } from '../src/nostr/binding';
 import {
   generateSenderWallet,
   wifFromPrivKey,
@@ -30,12 +31,10 @@ import {
   getTxs,
 } from '../src/chain/esplora';
 import { scanTransaction } from '../src/sp/scan';
+import { isBurnedSp } from '../src/sp/burned';
 
 const STATE_FILE = new URL('./.e2e-state.json', import.meta.url).pathname;
-// The regtest proof fixture publishes both private keys for this receiver.
-// It is deliberately disposable and must never receive a funded Signet tip.
-const PUBLIC_REGTEST_PROOF_RECEIVER =
-  'tsp1qqfjjuye7fjs4l9r73w86pnjr6j5kc93umzrs566p5gzxgj2ha6kycququrg9umwkk4nw2fd70a7w4wx6a9dztn7pqfdgc5kx43rgcprxlyhpz470';
+
 
 interface E2EState {
   mnemonic: string;
@@ -44,6 +43,9 @@ interface E2EState {
   spendPriv: string;
   senderWif: string;
   senderAddress: string;
+  nsec?: string;
+  nostrPubkey?: string;
+  bindingEventId?: string;
   silentTxid?: string;
   staticTxid?: string;
 }
@@ -75,6 +77,38 @@ if (cmd === 'gen') {
   console.log('SENDER demo wallet (P2WPKH, needs signet funds):');
   console.log('  ', state.senderAddress);
   console.log('WIF stored locally in', STATE_FILE);
+} else if (cmd === 'rotate') {
+  // Fresh creator identity + fresh nsec, generated OFF-CAMERA. Publishes one
+  // signed kind-30078 binding and stores everything locally (gitignored).
+  // Prints only public data. Prior burned identities are never reused.
+  const prev = existsSync(STATE_FILE)
+    ? (JSON.parse(readFileSync(STATE_FILE, 'utf8')) as E2EState)
+    : null;
+  const id = generateIdentity();
+  const key = newNostrTestKey();
+  const binding = { v: 1, sp: id.address, network: 'signet' as const };
+  const event = signBinding(binding, key.privKey);
+  const results = await publishEvent(event);
+  const state: E2EState = {
+    mnemonic: id.mnemonic,
+    tspAddress: id.address,
+    scanPriv: toHex(id.scanPrivKey),
+    spendPriv: toHex(id.spendPrivKey),
+    // keep the existing throwaway sender wallet (still the faucet target)
+    senderWif: prev?.senderWif ?? wifFromPrivKey(generateSenderWallet().privKey),
+    senderAddress: prev?.senderAddress ?? '',
+    nsec: key.nsec,
+    nostrPubkey: key.pubkey,
+    bindingEventId: event.id,
+  };
+  save(state);
+  console.log('FRESH CREATOR (public data only):');
+  console.log('  npub:', (await import('nostr-tools')).nip19.npubEncode(key.pubkey));
+  console.log('  tsp1:', id.address);
+  console.log('  binding event:', event.id);
+  for (const r of results) {
+    console.log(`  ${r.ok ? 'OK' : 'FAIL'} ${r.relay}${r.error ? ' — ' + r.error : ''}`);
+  }
 } else if (cmd === 'fund') {
   const s = load();
   const utxos = await getAddressUtxos(s.senderAddress);
@@ -99,8 +133,8 @@ if (cmd === 'gen') {
   console.log('Never reuse the public receiver in scripts/regtest-proof.json.');
 } else if (cmd === 'tip' || cmd === 'static') {
   const s = load();
-  if (cmd === 'tip' && s.tspAddress === PUBLIC_REGTEST_PROOF_RECEIVER) {
-    throw new Error('regtest fixture exposed this receiver private key; run rotate-receiver before any funded Signet tip');
+  if (cmd === 'tip' && isBurnedSp(s.tspAddress)) {
+    throw new Error('this receiver identity is compromised — run rotate before any funded signet tip');
   }
   const utxos = await getAddressUtxos(s.senderAddress);
   if (utxos.length === 0) throw new Error('no UTXOs — fund the wallet first');
@@ -182,5 +216,5 @@ if (cmd === 'gen') {
     if (found > 0) break;
   }
 } else {
-  console.log('usage: gen|rotate-receiver|fund|tip|static|scan');
+  console.log('usage: gen|rotate|rotate-receiver|fund|tip|static|scan');
 }

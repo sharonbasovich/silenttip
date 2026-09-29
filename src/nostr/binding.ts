@@ -126,7 +126,9 @@ export async function publishEvent(
   );
 }
 
-/** Fetch the newest valid binding event for a hex pubkey. */
+/** Fetch the newest valid binding event for a hex pubkey —
+ *  skips unparseable events AND invalid signatures, so a relay serving a
+ *  forged newer event cannot hide the real binding. */
 export async function fetchBinding(
   pubkey: string,
   relays: string[] = DEFAULT_RELAYS,
@@ -142,12 +144,8 @@ export async function fetchBinding(
     try {
       const binding = JSON.parse(event.content) as SilentTipBinding;
       if (binding.v !== 1 || typeof binding.sp !== 'string') continue;
-      return {
-        event,
-        binding,
-        pubkey: event.pubkey,
-        signatureValid: verifyEvent(event),
-      };
+      if (!verifyEvent(event)) continue;
+      return { event, binding, pubkey: event.pubkey, signatureValid: true };
     } catch {
       continue;
     }

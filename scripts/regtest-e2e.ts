@@ -15,16 +15,21 @@
  * output and derives the matching spending key.
  *
  * Proof artifacts are written to scripts/regtest-proof.json (committed) —
- * the fixture the regtest vitest replays. Keys come from the same throwaway
- * state file as the signet run (scripts/dist/.e2e-state.json, gitignored).
+ * the fixture the regtest vitest replays. The sender comes from the shared
+ * throwaway state file (scripts/dist/.e2e-state.json, gitignored); the
+ * RECEIVER is a dedicated regtest-only identity (scripts/dist/
+ * .regtest-state.json, gitignored) that is never bound to Nostr and never
+ * used on signet — publishing its keys is therefore harmless.
  *
- * REGTEST ONLY. This proves the same code path that runs on signet; it is
- * not, and is never presented as, a signet broadcast.
+ * REGTEST ONLY. The transaction builder and scanner are the same code the
+ * app uses (UTXO discovery, broadcast transport and block fetching differ:
+ * scantxoutset/sendrawtransaction/getblock vs Esplora). This is not, and is
+ * never presented as, a signet broadcast.
  */
 import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import secp from '@bitcoinerlab/secp256k1';
-import { fromHex, toHex } from '../src/sp/keys';
+import { fromHex, toHex, generateIdentity } from '../src/sp/keys';
 import {
   privKeyFromWif,
   walletFromPrivKey,
@@ -40,6 +45,7 @@ const BASE_ARGS = [
   '-regtest', '-rpcuser=st', '-rpcpassword=stregtest',
 ];
 const STATE_FILE = new URL('./.e2e-state.json', import.meta.url).pathname;
+const RECEIVER_FILE = new URL('./.regtest-state.json', import.meta.url).pathname;
 const PROOF_FILE = new URL('../regtest-proof.json', import.meta.url).pathname;
 
 function rpc<T>(method: string, ...params: (string | number | boolean)[]): T {
@@ -61,6 +67,31 @@ interface E2EState {
   spendPriv: string;
   senderWif: string;
   senderAddress: string;
+}
+
+/** Dedicated regtest-only receiver: never bound to Nostr, never used on
+ * signet, so publishing its keys in the committed fixture is harmless and
+ * keeps the proof self-verifying. Distinct from every promoted identity. */
+interface RegtestReceiver {
+  mnemonic: string;
+  tspAddress: string;
+  scanPriv: string;
+  spendPriv: string;
+}
+
+function regtestReceiver(): RegtestReceiver {
+  if (existsSync(RECEIVER_FILE)) {
+    return JSON.parse(readFileSync(RECEIVER_FILE, 'utf8')) as RegtestReceiver;
+  }
+  const id = generateIdentity();
+  const r: RegtestReceiver = {
+    mnemonic: id.mnemonic,
+    tspAddress: id.address,
+    scanPriv: toHex(id.scanPrivKey),
+    spendPriv: toHex(id.spendPrivKey),
+  };
+  writeFileSync(RECEIVER_FILE, JSON.stringify(r, null, 2));
+  return r;
 }
 
 /** Map bitcoind scriptPubKey type strings to Esplora scriptpubkey_type. */
@@ -141,6 +172,7 @@ const cmd = process.argv[2];
 if (cmd === 'run') {
   if (!existsSync(STATE_FILE)) throw new Error('run signet-e2e gen first — need throwaway keys');
   const s: E2EState = JSON.parse(readFileSync(STATE_FILE, 'utf8'));
+  const receiver = regtestReceiver();
   const wallet = walletFromPrivKey(privKeyFromWif(s.senderWif));
   const pubHex = toHex(wallet.pubKey);
 
@@ -166,7 +198,7 @@ if (cmd === 'run') {
   const plan = buildSilentTipTx({
     wallet,
     utxos,
-    spAddress: s.tspAddress,
+    spAddress: receiver.tspAddress,
     amountSats,
     feeRateSatVb: 1,
   });
@@ -183,8 +215,8 @@ if (cmd === 'run') {
 
   // Receiver scan: convert the block's transactions and run the repo scanner
   const block = rpc<{ tx: CoreTx[] }>('getblock', blockHash, '3');
-  const scanPriv = fromHex(s.scanPriv);
-  const spendPubKey = new Uint8Array(secp.pointFromScalar(fromHex(s.spendPriv), true)!);
+  const scanPriv = fromHex(receiver.scanPriv);
+  const spendPubKey = new Uint8Array(secp.pointFromScalar(fromHex(receiver.spendPriv), true)!);
   const matches: ScanMatch[] = [];
   for (const tx of block.tx) {
     matches.push(...scanTransaction(coreTxToEsplora(tx), scanPriv, spendPubKey));
@@ -196,7 +228,7 @@ if (cmd === 'run') {
 
   // The tweak must yield a valid spending key: (spendPriv + tweak)·G == outputKey
   const n = BigInt('0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141');
-  const spendPrivBig = BigInt('0x' + toHex(fromHex(s.spendPriv)));
+  const spendPrivBig = BigInt('0x' + toHex(fromHex(receiver.spendPriv)));
   const tweakBig = BigInt('0x' + tip.tweak);
   const outPriv = (spendPrivBig + tweakBig) % n;
   const outPrivHex = outPriv.toString(16).padStart(64, '0');
@@ -217,12 +249,13 @@ if (cmd === 'run') {
     outputKey: tip.outputKey,
     tweak: tip.tweak,
     senderAddress: s.senderAddress,
-    receiverTsp1: s.tspAddress,
-    // throwaway test keys — committed so the fixture is self-contained and the
-    // tweak math is reproducible by anyone (scan/spend privs of a demo tsp1
-    // identity that holds no funds anywhere)
-    scanPriv: s.scanPriv,
-    spendPriv: s.spendPriv,
+    receiverTsp1: receiver.tspAddress,
+    receiverRole: 'regtest-only, never bound to Nostr or used on signet',
+    // throwaway keys of the dedicated regtest-only receiver — committed so the
+    // fixture is self-contained and the tweak math is reproducible by anyone
+    scanPriv: receiver.scanPriv,
+    spendPriv: receiver.spendPriv,
+    txHex: plan.txHex,
     txEsploraShape: coreTxToEsplora(tipTx),
   };
   writeFileSync(PROOF_FILE, JSON.stringify(proof, null, 2));

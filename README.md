@@ -45,25 +45,23 @@ The four tabs walk the demo end to end:
 
 To run the flow for real: generate a sender wallet in the Tip tab, fund it from
 a public signet faucet, then send a tip and scan. (Public faucets are
-captcha/login-gated; the identical pipeline is proven end-to-end on local
+captcha/login-gated; the broadcast pipeline is proven end-to-end on local
 regtest — see `docs/evidence.md` §4b.)
 
 ## Demo assets
 
 - `video.html` + `public/demo.mp4` — judge-readable video page (deployed at
-  `/silenttip/video.html`) embedding the ~90 s walkthrough: identity → Nostr
-  publish → npub resolution → on-chain inspection → block scan.
-- `public/regtest-proof.mp4` + `scripts/regtest-proof.json` — 24 s screencast
-  and fixture of the full send → broadcast → receiver-scan run on a local
-  regtest bitcoind (`scripts/regtest-e2e.ts`; disposable keys/coins only,
-  honestly labeled regtest — the signet broadcast is still faucet-blocked).
-  The fixture intentionally publishes its receiver private keys for replay.
-  Its `tsp1qqfjju…` address and associated public Nostr binding are therefore
-  **compromised demo artifacts**: never send a funded Signet tip to them.
-  Before any future funded Signet run, execute
-  `node scripts/dist/signet-e2e.mjs rotate-receiver` to preserve the sender
-  wallet while creating a fresh private receiver, then publish a new signed
-  Nostr binding. The script refuses a tip to the exposed fixture address.
+  `/silenttip/video.html`) embedding the ~90 s captioned walkthrough: identity →
+  Nostr publish → npub resolution → on-chain inspection → block scan. (All
+  identities shown are disposable and rotated; the receiver seed is masked.)
+- `public/regtest-proof.mp4` + `scripts/regtest-proof.json` — 21 s screencast
+  and fixture (incl. raw tx hex) of the full send → broadcast → receiver-scan
+  run on a local regtest bitcoind (`scripts/regtest-e2e.ts`; disposable
+  keys/coins only, dedicated regtest-only receiver, honestly labeled regtest —
+  the signet broadcast is still faucet-blocked).
+- `scripts/signet-e2e.ts` also guards funded runs: `tip` refuses any tsp1 on
+  the burned list (`src/sp/burned.ts`), and `rotate` / `rotate-receiver`
+  generate fresh private receivers before a future funded signet demo.
 - `docs/screenshots/` — stills of each step.
 - `docs/evidence.md` — what is verified and what is not (read before judging).
 - `docs/judge-notes.md` — Cypherpunk-track self-audit of the hook/story.
@@ -142,6 +140,10 @@ signature — no trusted directory.
   *liveness*, not *correctness*: every retrieved event is signature-verified,
   and scanning is pure cryptography over raw block data — but a censoring API
   could hide transactions.
+- **Rotated demo identities are burned.** Two early demo tsp1 addresses had
+  private material exposed (committed fixture keys; a mnemonic in an early
+  video revision). Both are in `src/sp/burned.ts` — the Tip tab refuses to
+  tip them — and details/rotation are in `docs/evidence.md` §5b.
 - AI assistance: core implementation was drafted by Devin (Cognition) and
   reviewed/validated against the official BIP-352 vectors and the BIP-352
   Python reference implementation.

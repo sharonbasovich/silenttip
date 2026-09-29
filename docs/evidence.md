@@ -39,44 +39,45 @@ The app is deployed on GitHub Pages and was exercised live:
 - On the deployed site: generated a BIP-352 identity, published a binding,
   resolved the resulting npub (signature verified), ran a 1-block scan via
   Esplora, and inspected a real signet transaction — zero console errors.
-- **Binding event published from the hosted site:**
-  `3a6e4460e1dfea21…` (kind 30078, `d`=`silenttip`), accepted by all
-  three relays; author `npub18lc3g88l79s5ef20duxerpmchgmfyem665fyw5xucxetl540uxgqsq9kmx`,
-  binding `tsp1qq0nekn7ye8ckm9d7unfl9c8w5vqcaup0m2quphwa8r6kfs3c6xs76quvrz2zt43zcmqtgyas9zzjm40800nhkddv88n0drz636awdxvv0yprxu3l`.
-  The Tip tab re-resolved this npub to the same tsp1 address with a valid
-  schnorr signature.
-- **Two more bindings published from the hosted site on 2026-09-28** (visible
-  in the `video.html` walkthrough): `252f504ff529dd5d…` (3/3 relays) and
-  `4b7c717b8e55b832…` (damus.io + primal; nos.lol timed out).
+- **Binding events published from the hosted site (now BURNED — see §5b):**
+  `3a6e4460e1dfea21…`, `252f504ff529dd5d…` and `4b7c717b8e55b832…`
+  (kind 30078, `d`=`silenttip`), accepted by the public relays; they bound
+  `tsp1qq0nekn7ye8ckm9d7unfl9c8w5vqcaup0m2quphwa8r6kfs3c6xs76quvrz2zt43zcmqtgyas9zzjm40800nhkddv88n0drz636awdxvv0yprxu3l`.
+  That identity's mnemonic briefly appeared in an early revision of
+  `public/demo.mp4` — it is permanently compromised; do not tip it.
 
 ## 2. Nostr binding — a real, verifiable event on public relays
 
-A kind-30078 (NIP-78 parameterized replaceable) event with `d` tag
-`silenttip` was signed and published from the SilentTip UI to public relays
-on 2026-09-27:
+Kind-30078 (NIP-78 parameterized replaceable) events with `d` tag
+`silenttip` were signed and published to public relays:
 
-- **Event id:** `cb29c2ee12baf50a84c301aed11c40ec5762f517bfed56d5512f2ef2ba4ee1b0`
-- **Author:** `npub1uwc89e8w7gx98hxplr6xmdynnz8vtxl78ltuweks2y8vstws0mtsrt3g3q`
-- **Content:** `{"v":1,"sp":"tsp1qqfjjuye7fjs4l9r73w86pnjr6j5kc93umzrs566p5gzxgj2ha6kycququrg9umwkk4nw2fd70a7w4wx6a9dztn7pqfdgc5kx43rgcprxlyhpz470","network":"signet"}`
-- **Accepted by:** `wss://relay.damus.io`, `wss://relay.primal.net` (nos.lol timed out)
+**Current promoted demo creator** (generated off-camera on 2026-09-28; its
+keys live only in gitignored local state — no private material is committed):
 
-**Demo-only binding — receiver keys exposed:** The regtest proof fixture below
-publishes the scan and spend private keys for this exact `tsp1qqfjju…` address.
-Anyone can derive spending keys for a future output to it. The signed Nostr
-event remains valid evidence that publication and signature verification work,
-but this receiver address must never receive a funded Signet tip. Publish a
-new signed binding to a fresh, privately held receiver before such a run.
+- **Event id:** `5a9f1252c63454c7a1b4c604562a725060b0bb0434436d4e16bff9f67c2064f6`
+- **Author:** `npub1ds2lqjnc0u4zghaplaa306t0nz36l3fmzngnvztq5m5d4y9ruxtqy5ejdp`
+- **Content:** `{"v":1,"sp":"tsp1qq2fp8ruh26d3zwqm9ej6u970sw63cg7jz6g5c4ejek85u6sk9nlkyqesam0wxj0x9wpmvwaf7qvhvk3vkzclyuyjdy7p0wplls4x09lz0se02ypg","network":"signet"}`
+- **Accepted by:** `wss://relay.damus.io`, `wss://nos.lol`, `wss://relay.primal.net` (3/3)
 
-Verify it yourself:
+**Earlier bindings — BURNED** (signatures valid, but the bound tsp1 identities'
+private material became public — see §5b; do not tip them):
+
+- `cb29c2ee12baf50a84c301aed11c40ec5762f517bfed56d5512f2ef2ba4ee1b0` by
+  `npub1uwc89e8w7gx98hxplr6xmdynnz8vtxl78ltuweks2y8vstws0mtsrt3g3q` →
+  `tsp1qqfjjuye…` (its scan/spend keys were committed in an early
+  `regtest-proof.json` revision; public git history).
+- `67bc0957ec3ad835…` by `npub1uu8ffnzr9v97ut3u2spalz499k8vve4hrlxhtpwfmegujzjwplfqj6c8d8` → same burned `tsp1qqfjjuye…`.
+- `3a6e4460…`, `252f504f…`, `4b7c717b…` → burned `tsp1qq0nekn7…` (§1b).
+
+Verify any of them yourself:
 
 ```
-# any Nostr client or nak:
 nak req -k 30078 -d silenttip wss://relay.damus.io
 ```
 
-The **Tip** tab resolves `npub1uwc89e…` by fetching this event from relays and
-verifying the schnorr signature over the tsp1 binding in-browser.
-Screenshot: `docs/screenshots/tip-resolve-verified.jpg`.
+The **Tip** tab resolves an npub by fetching the newest *signature-valid*
+event from relays and verifying the schnorr signature over the tsp1 binding
+in-browser. Screenshot: `docs/screenshots/tip-resolve-verified.jpg`.
 
 ## 3. On-chain inspection — real signet data
 
@@ -126,34 +127,58 @@ funding.**
 
 ## 4b. Broadcast proof on local regtest — VERIFIED (not signet)
 
-To prove the exact send → broadcast → scan path end to end without a faucet,
-the same code ran against a local `bitcoind -regtest` node
-(`scripts/regtest-e2e.ts`, disposable throwaway keys and regtest coins only —
-nothing of value, nothing on a public network):
+To prove the send → broadcast → scan path end to end without a faucet,
+the app's transaction builder and scanner ran against a local
+`bitcoind -regtest` node (`scripts/regtest-e2e.ts`, disposable throwaway
+keys and regtest coins only — nothing of value, nothing on a public
+network):
 
 - **Funded** the throwaway sender key by mining 101 regtest blocks to the
   `bcrt1` address spending to the same key as `tb1qreve…` (regtest HRP).
 - **Built** a BIP-352 silent tip with the repo's own `buildSilentTipTx`:
-  5000 sats to `tsp1qqfjjuye…`, fee 153 sats.
+  5000 sats to a **dedicated regtest-only receiver** `tsp1qqfdna0xv9armxgezqm8jaetp6…`
+  (never bound to Nostr, never used on signet — distinct from every promoted
+  public identity, which `test/regtest.test.ts` asserts), fee 153 sats.
 - **Broadcast** via `sendrawtransaction` and mined it into regtest
-  **block 103**: txid `44e2677292eff91f5428737d7702d4c7c5238be6121f86434631c80e54616beb`.
+  **block 105** (`4816d997…b939`): txid
+  `928cdd9afb3fa8504989749dca1fe19fa42ca0e3ee6f8de73f431ccef6e7ad58`.
 - **Receiver scan** of that block with the repo's own `scanTransaction`
   found exactly one match — vout 0, 5000 sats — and `(spendPriv + tweak)·G`
   reproduced the output key, i.e. the receiver can spend it.
-- Screencast of the run: `public/regtest-proof.mp4` (24 s); the committed
-  fixture `scripts/regtest-proof.json` is replayed by `test/regtest.test.ts`
-  so CI re-verifies the scan and tweak math on every run.
-- The fixture intentionally contains **public disposable receiver private
-  keys** to make the proof replayable. Its `tsp1qqfjju…` address is the same
-  one in the public Nostr binding above and is permanently unsafe for any
-  future funded Signet use. The normal app generates fresh, private keys;
-  the proof identity is an exception used only for this test.
+- The committed fixture `scripts/regtest-proof.json` includes the raw
+  broadcast transaction hex (`txHex`, 468 chars) plus the Esplora-shaped
+  decode; `test/regtest.test.ts` re-derives the txid from the hex and
+  replays the scan so CI re-verifies everything on every run.
+- Screencast of the run: `public/regtest-proof.mp4` (21 s).
 - Reproduce: `node scripts/dist/regtest-e2e.mjs run` against any
   `bitcoin/bitcoin` regtest container (see the script header).
 
-**This is a regtest proof of the identical code path — it is NOT claimed to
-be a signet broadcast.** Section 4 above still applies: a signet txid is
-still pending faucet funding.
+**What this proves, precisely:** the transaction builder and scanner are the
+same code the app uses — UTXO discovery, broadcast transport and block
+fetching differ (regtest RPC vs. public Esplora). It is NOT a signet
+broadcast claim. Section 4 above still applies: a signet txid is still
+pending faucet funding.
+
+## 5b. Rotated / compromised identities — do not tip
+
+Two demo receiver identities are permanently burned; the Tip tab warns when
+one resolves (`src/sp/burned.ts`):
+
+| tsp1 | Why burned |
+| --- | --- |
+| `tsp1qqfjjuye7fjs4l9r73w86pnjr6j5kc93umzrs566p5gzxgj2ha6kycququrg9umwkk4nw2fd70a7w4wx6a9dztn7pqfdgc5kx43rgcprxlyhpz470` | scan/spend keys committed in an early `regtest-proof.json` revision (public git history) |
+| `tsp1qq0nekn7ye8ckm9d7unfl9c8w5vqcaup0m2quphwa8r6kfs3c6xs76quvrz2zt43zcmqtgyas9zzjm40800nhkddv88n0drz636awdxvv0yprxu3l` | mnemonic shown on-screen in an early `public/demo.mp4` revision |
+
+Linked npubs (all disposable, never holding funds): `npub1uwc89e8w7gx98hxplr6xmdynnz8vtxl78ltuweks2y8vstws0mtsrt3g3q`, `npub1uu8ffnzr9v97ut3u2spalz499k8vve4hrlxhtpwfmegujzjwplfqj6c8d8`, `npub18lc3g88l79s5ef20duxerpmchgmfyem665fyw5xucxetl540uxgqsq9kmx`, `npub1ryfw69k…`, `npub13pu5hrk…`.
+
+**Revocation blocker:** NIP-09 deletion/replacement of the old binding
+events requires the *author nsecs*, which the UI deliberately never
+persisted (`src/state.ts` stores only `nostrPubkey`). They are
+unrecoverable, so the burned events will keep serving from relays; the fix
+is exactly this rotation + the in-app warning + honest labeling. The
+88 s demo was recut with the seed phrase masked and captions added; the
+regtest proof was regenerated against the dedicated regtest-only receiver
+above.
 
 ## 5. What is deliberately not claimed
 

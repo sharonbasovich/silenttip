@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
+import * as bitcoin from 'bitcoinjs-lib';
 import secp from '@bitcoinerlab/secp256k1';
 import { scanTransaction } from '../src/sp/scan';
 import { decodeSpAddress, fromHex, toHex } from '../src/sp/keys';
+import { BURNED_TSP1, isBurnedSp } from '../src/sp/burned';
 import type { EsploraTx } from '../src/chain/esplora';
 
 /**
@@ -10,8 +12,9 @@ import type { EsploraTx } from '../src/chain/esplora';
  * local bitcoind -regtest node and mined; the committed fixture contains the
  * broadcast transaction and the throwaway receiver keys.
  *
- * REGTEST ONLY — this proves the exact code path used on signet; it is not
- * a signet broadcast claim.
+ * REGTEST ONLY — the transaction builder and scanner exercised here are the
+ * same code the app uses on signet (UTXO discovery, broadcast transport and
+ * block fetching differ); it is not a signet broadcast claim.
  */
 interface RegtestProof {
   network: string;
@@ -22,8 +25,10 @@ interface RegtestProof {
   outputKey: string;
   tweak: string;
   receiverTsp1: string;
+  receiverRole: string;
   scanPriv: string;
   spendPriv: string;
+  txHex: string;
   txEsploraShape: EsploraTx;
 }
 
@@ -35,11 +40,33 @@ const CURVE_N = BigInt(
   '0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141',
 );
 
+/** Every public receiver identity that has ever been promoted (current +
+ *  rotated/burned). The regtest proof receiver must be none of them. */
+const PROMOTED_TSP1 = [
+  // current promoted creator (fresh, off-camera, published 2026-09-27)
+  'tsp1qq2fp8ruh26d3zwqm9ej6u970sw63cg7jz6g5c4ejek85u6sk9nlkyqesam0wxj0x9wpmvwaf7qvhvk3vkzclyuyjdy7p0wplls4x09lz0se02ypg',
+  ...BURNED_TSP1,
+];
+
 describe('regtest broadcast proof (local only, disposable keys)', () => {
   it('fixture is honestly labeled regtest, not signet', () => {
     expect(proof.network).toBe('regtest');
     expect(proof.label).toContain('REGTEST');
     expect(proof.label).toContain('not a signet broadcast');
+  });
+
+  it('proof receiver is a dedicated regtest-only identity, not any promoted tsp1', () => {
+    expect(proof.receiverRole).toContain('regtest-only');
+    expect(PROMOTED_TSP1).not.toContain(proof.receiverTsp1);
+    expect(isBurnedSp(proof.receiverTsp1)).toBe(false);
+  });
+
+  it('raw tx hex decodes to the claimed txid', () => {
+    expect(proof.txHex).toMatch(/^[0-9a-f]+$/);
+    const tx = bitcoin.Transaction.fromHex(proof.txHex);
+    expect(tx.getId()).toBe(proof.txid);
+    expect(toHex(new Uint8Array(tx.outs[proof.silentVout].script)))
+      .toBe(proof.txEsploraShape.vout[proof.silentVout].scriptpubkey);
   });
 
   it('receiver scan detects the broadcast silent output', () => {

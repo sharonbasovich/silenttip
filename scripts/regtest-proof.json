@@ -1,24 +1,26 @@
 {
   "network": "regtest",
   "label": "LOCAL REGTEST ONLY — not a signet broadcast",
-  "blockHeight": 103,
-  "blockHash": "62487c116e8d56d5a30b49dc42c0bd10edbef43196788396f25d8934fdfb5cae",
-  "txid": "44e2677292eff91f5428737d7702d4c7c5238be6121f86434631c80e54616beb",
+  "blockHeight": 105,
+  "blockHash": "4816d9977aeb15f575ec952754a1982fe3121879d6e8988979f2b5289466b939",
+  "txid": "928cdd9afb3fa8504989749dca1fe19fa42ca0e3ee6f8de73f431ccef6e7ad58",
   "amountSats": 5000,
   "silentVout": 0,
-  "outputKey": "7abd379506983844f2093568fcc5593d5f7bef0f90fb69320b7f805ec4a2ca8a",
-  "tweak": "d941454b6cbc4bbafae865ba5a5650d149d39ff2622807af226767fba8c14ede",
+  "outputKey": "424eb0eeaae741b55743b62fd47d5fd1c611a6d9b85aec116c904a052e6e2ea7",
+  "tweak": "21e47ae3486dcb5ce29450c409c90827638a328b1586a04e649207df1eb5e573",
   "senderAddress": "tb1qreve5pu58jj7y8gej3akgfsse2vnfw6xhf6q2j",
-  "receiverTsp1": "tsp1qqfjjuye7fjs4l9r73w86pnjr6j5kc93umzrs566p5gzxgj2ha6kycququrg9umwkk4nw2fd70a7w4wx6a9dztn7pqfdgc5kx43rgcprxlyhpz470",
-  "scanPriv": "e0865dc91f2da0b760361e3d0704c26b899dfa5f96ab389a025f6069af0c1154",
-  "spendPriv": "5a5c7df81a99a0178a37188475f2c4175841b58d509f94cfb48ad73acd93150f",
+  "receiverTsp1": "tsp1qqfdna0xv9armxgezqm8jaetp60swtnwr9lv7yu9juw3640dkfuzk2qs5rqqgg84ytndutpd45qkq999ug2a2xavhea4md59wy085q364ycaq24g4",
+  "receiverRole": "regtest-only, never bound to Nostr or used on signet",
+  "scanPriv": "03ceee3b4222840304134a4278e8031d540b7f1d359a3eaa0691c79f5404f7b5",
+  "spendPriv": "c7e9ae913e90e02e87c33fdf9641e368eb76f2115a02e381d9190bead9030f33",
+  "txHex": "020000000001010408d4c8be4e339a7d467ee4238ce41ff8ffbe93bb7e5960becd00d28cf969a40000000000ffffffff028813000000000000225120424eb0eeaae741b55743b62fd47d5fd1c611a6d9b85aec116c904a052e6e2ea7dfdd052a010000001600141e599a07943ca5e21d19947b642610ca9934bb460247304402202c5284ac57944609178ad6b70eedece132c563411cf9801c6091ebf0cd584d290220367b1d026ff609a1d43715284c28c9c87ac19cdce9234faf0a28da9f5f7bc9870121025d7fb8bb60fd14415a1685a580d97eacbf22f861a489302ab0ace0e04123633b00000000",
   "txEsploraShape": {
-    "txid": "44e2677292eff91f5428737d7702d4c7c5238be6121f86434631c80e54616beb",
+    "txid": "928cdd9afb3fa8504989749dca1fe19fa42ca0e3ee6f8de73f431ccef6e7ad58",
     "version": 2,
     "locktime": 0,
     "vin": [
       {
-        "txid": "44cf3ece2dc9c3228299da22b88242d52ea655455145c81fd8febf2caa5d212b",
+        "txid": "a469f98cd200cdbe60597ebb93befff81fe48c23e47e467d9a334ebec8d40804",
         "vout": 0,
         "prevout": {
           "scriptpubkey": "00141e599a07943ca5e21d19947b642610ca9934bb46",
@@ -27,7 +29,7 @@
         },
         "scriptsig": "",
         "witness": [
-          "30450221008ad3fb87c454031c2ce655a1cd54635d18170b4ee26e8ac4de44baff7c9e782802205466432684bcec7db797907160e0ad56f52f53b57651350eda2bfc972b681b8a01",
+          "304402202c5284ac57944609178ad6b70eedece132c563411cf9801c6091ebf0cd584d290220367b1d026ff609a1d43715284c28c9c87ac19cdce9234faf0a28da9f5f7bc98701",
           "025d7fb8bb60fd14415a1685a580d97eacbf22f861a489302ab0ace0e04123633b"
         ],
         "is_coinbase": false
@@ -35,7 +37,7 @@
     ],
     "vout": [
       {
-        "scriptpubkey": "51207abd379506983844f2093568fcc5593d5f7bef0f90fb69320b7f805ec4a2ca8a",
+        "scriptpubkey": "5120424eb0eeaae741b55743b62fd47d5fd1c611a6d9b85aec116c904a052e6e2ea7",
         "scriptpubkey_type": "v1_p2tr",
         "value": 5000
       },

@@ -53,7 +53,12 @@
         <h1><span class="accent">Silent</span>Tip — 90-second demo</h1>
         <p class="sub">
           A Nostr creator publishes one reusable silent-payment identity; every tip to it lands at a
-          fresh, unlinked on-chain address. Everything below runs on Bitcoin signet — test coins only.
+          fresh on-chain output observers cannot link back to it. Everything below runs on Bitcoin
+          signet — test coins only.
+        </p>
+        <p class="sub" style="font-size:0.82rem">
+          All identities shown are disposable and were rotated after recording — the receiver seed
+          phrase is masked on-screen. Sender inputs, change, amounts and timing stay visible.
         </p>
       </header>
 
@@ -75,17 +80,22 @@
           Address reuse is how chain analysis clusters a creator's income. Silent payments fix it at the
           protocol level: the sender does the ECDH work off-chain, so each tip creates a brand-new taproot
           output. The chain never sees the creator's published address — there is nothing to cluster.
+          (Honest limits: sender inputs, change, amounts and timing stay visible, and spending several
+          tips together can link those outputs to each other.)
         </p>
       </div>
 
       <p class="note">
-        <b>Broadcast proof on local regtest (24 s):</b> the same code path — build, broadcast,
-        mine, receiver scan — runs end to end on a disposable regtest chain below. On public
-        signet, broadcasting is still blocked only by captcha/login-gated faucets — see
+        <b>Broadcast proof on local regtest (21 s):</b> a real BIP-352 tip to a dedicated
+        regtest-only receiver — built by the repo's own transaction builder, broadcast, mined,
+        and found by the repo's own receiver scan — runs end to end on a disposable regtest chain
+        below (the transaction builder and scanner are the same code the app uses; UTXO discovery,
+        broadcast transport and block fetching differ). On public signet, broadcasting is still
+        blocked only by captcha/login-gated faucets — see
         <a href="https://github.com/sharonbasovich/silenttip/blob/main/docs/evidence.md">docs/evidence.md</a>
         for the exact, verifiable record of what has and has not been broadcast.
-        The regtest fixture publishes its disposable receiver keys, so the
-        Nostr-bound address shown in that proof must never be used for a funded Signet tip.
+        The fixture's regtest-only receiver keys are public — it is never bound to
+        Nostr and never used on signet; promoted identities are always fresh and private.
       </p>
 
       <video controls playsinline preload="metadata" src="./regtest-proof.mp4"></video>

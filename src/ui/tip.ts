@@ -20,6 +20,7 @@ import {
   type EsploraUtxo,
 } from '../chain/esplora';
 import { addSentTip, loadState, saveState } from '../state';
+import { isBurnedSp } from '../sp/burned';
 
 export function renderTip(root: HTMLElement): void {
   const panel = el('section', { class: 'panel' });
@@ -54,6 +55,11 @@ export function renderTip(root: HTMLElement): void {
             'Direct tsp1 address — no Nostr binding checked. (Unverified: anyone can paste any address.)'),
           copyable(input),
         );
+        if (isBurnedSp(input)) {
+          bindingBox.append(el('div', { class: 'status err' },
+            'COMPROMISED demo identity — its private keys were made public; do not tip it.'));
+          resolvedSp = null;
+        }
         return;
       }
       const pubkey = await resolveIdentifier(input);
@@ -69,7 +75,14 @@ export function renderTip(root: HTMLElement): void {
         copyable(res.binding.sp),
         el('div', { class: 'status ok' }, `signature valid · event ${res.event.id.slice(0, 16)}…`),
       );
-      resolveStatus.ok('Binding verified.');
+      if (isBurnedSp(res.binding.sp)) {
+        bindingBox.append(el('div', { class: 'status err' },
+          'COMPROMISED demo identity — its private keys were made public; do not tip it.'));
+        resolvedSp = null;
+        resolveStatus.err('Binding is valid but the recipient is a burned demo identity.');
+      } else {
+        resolveStatus.ok('Binding verified.');
+      }
     } catch (e) {
       resolveStatus.err((e as Error).message);
     }
