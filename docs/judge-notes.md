@@ -31,9 +31,11 @@ interactive alternative and equal-effort to the address-reuse default:
 | Chain privacy | full income clustering | every tip unlinked, P2TR-native |
 | Receiver UX | watch address | scan blocks (or future tweak service) |
 
-The demo is built to *show* this rather than assert it: the "What the chain
-sees" tab renders the same tip both ways from real signet data — clustered vs.
-unlinked — so the privacy claim is observable, not rhetorical.
+The demo is built to *show* the distinction rather than assert it: the "What
+the chain sees" tab inspects a real, unrelated Signet transaction to explain
+what output scripts reveal. The separate local-regtest proof broadcasts and
+scans SilentTip's own silent-payment transaction. No side-by-side public
+Signet tip pair has been broadcast yet.
 
 ## Cypherpunk-fit checklist (self-scored)
 
@@ -47,8 +49,10 @@ unlinked — so the privacy claim is observable, not rhetorical.
 - **Keys stay separate from identity** — the `tsp1` keys are independent of the
   `nsec` (unlike draft nips#2355). Rotating the payment identity doesn't burn
   the social one, and a leaked Nostr key can't spend anything.
-- **Self-custody end to end** — keys are browser-local; no server, no custody,
-  no signup.
+- **Self-custody end to end** — normal interactive identities keep keys
+  browser-local; no server, no custody, no signup. The separately recorded
+  regtest fixture deliberately publishes disposable receiver keys for
+  reproducibility, so its Nostr-bound address is not safe for funded tips.
 - **Protocol correctness over demo polish** — all 28 official BIP-352
   send/receive vectors pass, including edge cases the upstream npm package
   gets wrong (K_max, intermediate point-at-infinity sums, eligible-input
@@ -66,6 +70,9 @@ unlinked — so the privacy claim is observable, not rhetorical.
   identical code path — `scripts/regtest-proof.json`, 24 s screencast) but
   not yet on **signet**: the throwaway wallet needs ~10k faucet sats that
   require a human behind a captcha. We state this rather than simulate it.
+- The regtest fixture reveals the private keys of its publicly bound receiver;
+  rotate that receiver and publish a fresh signed binding before any future
+  funded Signet demonstration.
 - Full-chain scanning is expensive; the demo caps at 40 blocks and says so.
 - Sender privacy is out of scope — the sender's P2WPKH input reveals *who*
   tipped, just not *whom*. That asymmetry is itself part of the demo's story.

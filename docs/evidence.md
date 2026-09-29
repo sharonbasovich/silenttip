@@ -60,6 +60,13 @@ on 2026-09-27:
 - **Content:** `{"v":1,"sp":"tsp1qqfjjuye7fjs4l9r73w86pnjr6j5kc93umzrs566p5gzxgj2ha6kycququrg9umwkk4nw2fd70a7w4wx6a9dztn7pqfdgc5kx43rgcprxlyhpz470","network":"signet"}`
 - **Accepted by:** `wss://relay.damus.io`, `wss://relay.primal.net` (nos.lol timed out)
 
+**Demo-only binding — receiver keys exposed:** The regtest proof fixture below
+publishes the scan and spend private keys for this exact `tsp1qqfjju…` address.
+Anyone can derive spending keys for a future output to it. The signed Nostr
+event remains valid evidence that publication and signature verification work,
+but this receiver address must never receive a funded Signet tip. Publish a
+new signed binding to a fresh, privately held receiver before such a run.
+
 Verify it yourself:
 
 ```
@@ -109,8 +116,11 @@ The full pipeline — funding check, silent tip construction, broadcast, and
 receiver-side scan — is implemented in `scripts/signet-e2e.ts` and in the UI
 (**Tip** tab → *Build & broadcast*), and every crypto step it performs is
 covered by the vector suite. If the wallet gets funded before the deadline,
-`node scripts/dist/signet-e2e.mjs tip` broadcasts the real transaction and
-its txid will be recorded here. Until then the honest status is:
+first run `node scripts/dist/signet-e2e.mjs rotate-receiver` to replace the
+publicly exposed proof receiver without losing the funded sender wallet, and
+publish a new signed Nostr binding. Only then may
+`node scripts/dist/signet-e2e.mjs tip` broadcast the real transaction; its
+txid will be recorded here. Until then the honest status is:
 **crypto proven on all 28 official vectors; live signet broadcast pending
 funding.**
 
@@ -133,6 +143,11 @@ nothing of value, nothing on a public network):
 - Screencast of the run: `public/regtest-proof.mp4` (24 s); the committed
   fixture `scripts/regtest-proof.json` is replayed by `test/regtest.test.ts`
   so CI re-verifies the scan and tweak math on every run.
+- The fixture intentionally contains **public disposable receiver private
+  keys** to make the proof replayable. Its `tsp1qqfjju…` address is the same
+  one in the public Nostr binding above and is permanently unsafe for any
+  future funded Signet use. The normal app generates fresh, private keys;
+  the proof identity is an exception used only for this test.
 - Reproduce: `node scripts/dist/regtest-e2e.mjs run` against any
   `bitcoin/bitcoin` regtest container (see the script header).
 
@@ -144,6 +159,8 @@ still pending faucet funding.
 
 - No mainnet keys, transactions, or funds anywhere.
 - No claim that a silent tip has been broadcast until a signet txid exists.
+- No claim that the public regtest fixture's receiver key remains private or
+  safe to receive future Signet tips.
 - The Nostr binding proves *intent to receive*, not custody — the tsp1 keys
   are BIP-352-derived and independent of the nsec that signs the event.
 - Silent payments do not hide the sender's inputs; they unlink the

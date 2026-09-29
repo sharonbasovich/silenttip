@@ -71,6 +71,11 @@ creator, the sender, or any other tip to the same address.
   (`scripts/regtest-proof.json` + 24 s screencast, honestly labeled) and
   left the signet broadcast gated on a human faucet run —
   `docs/evidence.md` states this explicitly rather than papering over it.
+- **The replay fixture is intentionally public.** Its disposable receiver
+  private keys are committed so judges can reproduce the regtest scan.
+  Therefore the `tsp1` address in that proof and its signed Nostr binding are
+  unsafe for future funded tips; the Signet script requires a fresh receiver
+  and a new signed binding before broadcasting.
 - **Scanning is expensive.** A receiver must trial-decrypt every taproot
   output in range; we scoped the demo to recent blocks and made the cost
   visible instead of hiding it.

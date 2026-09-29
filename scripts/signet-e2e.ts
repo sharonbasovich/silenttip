@@ -2,6 +2,7 @@
  * Live signet end-to-end run (test keys only — no real funds).
  *
  *   node scripts/dist/signet-e2e.mjs gen      # create + persist throwaway keys
+ *   node scripts/dist/signet-e2e.mjs rotate-receiver # replace public proof identity
  *   node scripts/dist/signet-e2e.mjs fund     # print faucet instructions
  *   node scripts/dist/signet-e2e.mjs tip      # build + broadcast the silent tip
  *   node scripts/dist/signet-e2e.mjs static   # broadcast an address-reuse tip
@@ -31,6 +32,10 @@ import {
 import { scanTransaction } from '../src/sp/scan';
 
 const STATE_FILE = new URL('./.e2e-state.json', import.meta.url).pathname;
+// The regtest proof fixture publishes both private keys for this receiver.
+// It is deliberately disposable and must never receive a funded Signet tip.
+const PUBLIC_REGTEST_PROOF_RECEIVER =
+  'tsp1qqfjjuye7fjs4l9r73w86pnjr6j5kc93umzrs566p5gzxgj2ha6kycququrg9umwkk4nw2fd70a7w4wx6a9dztn7pqfdgc5kx43rgcprxlyhpz470';
 
 interface E2EState {
   mnemonic: string;
@@ -80,8 +85,23 @@ if (cmd === 'gen') {
     console.log('  https://signetfaucet.com  (or bitcoinsignetfaucet.com)');
     console.log('  address:', s.senderAddress);
   }
+} else if (cmd === 'rotate-receiver') {
+  const s = load();
+  const id = generateIdentity();
+  s.mnemonic = id.mnemonic;
+  s.tspAddress = id.address;
+  s.scanPriv = toHex(id.scanPrivKey);
+  s.spendPriv = toHex(id.spendPrivKey);
+  delete s.silentTxid;
+  save(s); // preserve the existing sender wallet, including any faucet UTXOs
+  console.log('New private receiver identity:', s.tspAddress);
+  console.log('Publish a NEW signed Nostr binding before using this identity in the hosted tip flow.');
+  console.log('Never reuse the public receiver in scripts/regtest-proof.json.');
 } else if (cmd === 'tip' || cmd === 'static') {
   const s = load();
+  if (cmd === 'tip' && s.tspAddress === PUBLIC_REGTEST_PROOF_RECEIVER) {
+    throw new Error('regtest fixture exposed this receiver private key; run rotate-receiver before any funded Signet tip');
+  }
   const utxos = await getAddressUtxos(s.senderAddress);
   if (utxos.length === 0) throw new Error('no UTXOs — fund the wallet first');
   const feeRate = Math.max(1, Math.ceil((await getFeeEstimates())[1] ?? 1));
@@ -162,5 +182,5 @@ if (cmd === 'gen') {
     if (found > 0) break;
   }
 } else {
-  console.log('usage: gen|fund|tip|static|scan');
+  console.log('usage: gen|rotate-receiver|fund|tip|static|scan');
 }

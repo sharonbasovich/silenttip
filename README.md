@@ -57,6 +57,13 @@ regtest — see `docs/evidence.md` §4b.)
   and fixture of the full send → broadcast → receiver-scan run on a local
   regtest bitcoind (`scripts/regtest-e2e.ts`; disposable keys/coins only,
   honestly labeled regtest — the signet broadcast is still faucet-blocked).
+  The fixture intentionally publishes its receiver private keys for replay.
+  Its `tsp1qqfjju…` address and associated public Nostr binding are therefore
+  **compromised demo artifacts**: never send a funded Signet tip to them.
+  Before any future funded Signet run, execute
+  `node scripts/dist/signet-e2e.mjs rotate-receiver` to preserve the sender
+  wallet while creating a fresh private receiver, then publish a new signed
+  Nostr binding. The script refuses a tip to the exposed fixture address.
 - `docs/screenshots/` — stills of each step.
 - `docs/evidence.md` — what is verified and what is not (read before judging).
 - `docs/judge-notes.md` — Cypherpunk-track self-audit of the hook/story.
