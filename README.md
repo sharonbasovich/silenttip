@@ -22,7 +22,7 @@ visible to judges in one click.
 > services. All keys are throwaway test keys generated in your browser.
 
 **Live demo:** https://sharonbasovich.github.io/silenttip/ ·
-**90-second video:** https://sharonbasovich.github.io/silenttip/video.html
+**72-second video:** https://sharonbasovich.github.io/silenttip/video.html
 
 ## Try it
 
@@ -50,22 +50,27 @@ regtest — see `docs/evidence.md` §4b.)
 
 ## Demo assets
 
-- `video.html` + `public/demo.mp4` — judge-readable video page (deployed at
-  `/silenttip/video.html`) embedding the ~90 s captioned walkthrough: identity →
-  Nostr publish → npub resolution → on-chain inspection → block scan. (All
-  identities shown are disposable and rotated; the receiver seed is masked.)
-- `public/regtest-proof.mp4` + `scripts/regtest-proof.json` — 21 s screencast
+- [`video.html`](video.html) + [`public/demo.mp4`](public/demo.mp4) —
+  judge-readable video page (deployed at `/silenttip/video.html`) embedding the
+  ~72 s captioned walkthrough: identity restore → npub resolution →
+  honest unfunded-broadcast gate → on-chain inspection → block scan. Only the
+  promoted demo identity appears; the receiver seed is never shown.
+- [`public/regtest-proof.mp4`](public/regtest-proof.mp4) +
+  [`scripts/regtest-proof.json`](scripts/regtest-proof.json) — 21 s screencast
   and fixture (incl. raw tx hex) of the full send → broadcast → receiver-scan
-  run on a local regtest bitcoind (`scripts/regtest-e2e.ts`; disposable
-  keys/coins only, dedicated regtest-only receiver, honestly labeled regtest —
-  the signet broadcast is still faucet-blocked).
-- `scripts/signet-e2e.ts` also guards funded runs: `tip` refuses any tsp1 on
-  the burned list (`src/sp/burned.ts`), and `rotate` / `rotate-receiver`
+  run on a local regtest bitcoind ([`scripts/regtest-e2e.ts`](scripts/regtest-e2e.ts);
+  disposable keys/coins only, dedicated regtest-only receiver, honestly labeled
+  regtest — the signet broadcast is still faucet-blocked).
+- [`scripts/signet-e2e.ts`](scripts/signet-e2e.ts) also guards funded runs:
+  `tip` refuses any tsp1 on the burned list
+  ([`src/sp/burned.ts`](src/sp/burned.ts)), and `rotate` / `rotate-receiver`
   generate fresh private receivers before a future funded signet demo.
-- `docs/screenshots/` — stills of each step.
-- `docs/evidence.md` — what is verified and what is not (read before judging).
-- `docs/judge-notes.md` — Cypherpunk-track self-audit of the hook/story.
-- `docs/devfolio-draft.md` — submission copy draft.
+- [`docs/screenshots/`](docs/screenshots) — stills of each step.
+- [`docs/evidence.md`](docs/evidence.md) — what is verified and what is not
+  (read before judging).
+- [`docs/judge-notes.md`](docs/judge-notes.md) — Cypherpunk-track self-audit
+  of the hook/story.
+- [`docs/devfolio-draft.md`](docs/devfolio-draft.md) — submission copy draft.
 
 ## Architecture
 
@@ -143,7 +148,8 @@ signature — no trusted directory.
 - **Rotated demo identities are burned.** Two early demo tsp1 addresses had
   private material exposed (committed fixture keys; a mnemonic in an early
   video revision). Both are in `src/sp/burned.ts` — the Tip tab refuses to
-  tip them — and details/rotation are in `docs/evidence.md` §5b.
+  tip them — and details/rotation are in
+  [`docs/evidence.md`](docs/evidence.md) §5b.
 - AI assistance: core implementation was drafted by Devin (Cognition) and
   reviewed/validated against the official BIP-352 vectors and the BIP-352
   Python reference implementation.

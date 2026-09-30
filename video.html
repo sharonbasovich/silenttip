@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>SilentTip — 90-second demo</title>
+    <title>SilentTip — 72-second demo</title>
     <meta
       name="description"
       content="Judge-readable walkthrough: publish a Nostr-bound silent-payment identity, resolve it, and see what the chain sees. Signet only."
@@ -50,15 +50,17 @@
     <div class="wrap">
       <header>
         <span class="badge">signet only · no real funds</span>
-        <h1><span class="accent">Silent</span>Tip — 90-second demo</h1>
+        <h1><span class="accent">Silent</span>Tip — 72-second demo</h1>
         <p class="sub">
           A Nostr creator publishes one reusable silent-payment identity; every tip to it lands at a
           fresh on-chain output observers cannot link back to it. Everything below runs on Bitcoin
           signet — test coins only.
         </p>
         <p class="sub" style="font-size:0.82rem">
-          All identities shown are disposable and were rotated after recording — the receiver seed
-          phrase is masked on-screen. Sender inputs, change, amounts and timing stay visible.
+          This walkthrough was re-captured after earlier demo identities were retired: only the
+          promoted demo identity appears, and the receiver seed is never shown (the restore field
+          is password-masked and the rendered seed element is blanked before it can paint). Sender
+          inputs, change, amounts and timing stay visible.
         </p>
       </header>
 
@@ -67,8 +69,8 @@
       <div class="card">
         <h2>What you're seeing</h2>
         <ol class="beats">
-          <li><b>Receive</b> — generate a silent-payment identity (scan + spend keys, browser-side) and publish it as a signed Nostr event (<code>kind 30078</code>, <code>d=silenttip</code>) that public relays accept.</li>
-          <li><b>Tip</b> — paste the creator's <code>npub</code>; the app resolves the binding live, verifies the schnorr signature, and derives the BIP-352 output key (<code>P = B_spend + hash(input_hash·a·B_scan‖k)·G</code>).</li>
+          <li><b>Receive</b> — restore the demo silent-payment identity (scan + spend keys, browser-side; the seed never appears). Its <code>tsp1</code> address was published as a signed Nostr event (<code>kind 30078</code>, <code>d=silenttip</code>) that public relays accepted.</li>
+          <li><b>Tip</b> — paste the creator's <code>npub</code>; the app resolves the binding live, verifies the schnorr signature, and shows the bound <code>tsp1</code> (event <code>5a9f1252…</code>). A throwaway sender wallet is generated and the broadcast button honestly reports <i>no UTXOs</i> — the demo wallet is unfunded, so nothing is claimed on-chain.</li>
           <li><b>What the chain sees</b> — inspect any real signet transaction's outputs: a silent tip is just another x-only taproot key — nothing links it to the reusable address. (The tx shown is an unrelated signet tx, presented as what a tip looks like, not claimed to be one.)</li>
           <li><b>Scan</b> — the receiver's scan key walks signet blocks via Esplora and recomputes candidate outputs; only their keys reveal which outputs are theirs.</li>
         </ol>

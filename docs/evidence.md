@@ -8,7 +8,7 @@ All 28 official send-and-receive test vectors from `bitcoin/bips` (BIP-352)
 pass against the implementation in `src/sp/outputs.ts` + `src/sp/scan.ts`:
 
 ```
-npm test          # 69 tests, all green
+npm test          # 87 tests, all green
 ```
 
 `test/vectors.test.ts` consumes the vendored vector file
@@ -175,9 +175,17 @@ Linked npubs (all disposable, never holding funds): `npub1uwc89e8w7gx98hxplr6xmd
 events requires the *author nsecs*, which the UI deliberately never
 persisted (`src/state.ts` stores only `nostrPubkey`). They are
 unrecoverable, so the burned events will keep serving from relays; the fix
-is exactly this rotation + the in-app warning + honest labeling. The
-88 s demo was recut with the seed phrase masked and captions added; the
-regtest proof was regenerated against the dedicated regtest-only receiver
+is exactly this rotation + the in-app warning + honest labeling.
+
+**Video history.** The first 88 s `demo.mp4` showed the burned
+`tsp1qq0nekn7…` identity's mnemonic on-screen. A first recut masked the
+seed region but still displayed the burned tsp1/npub, so the current
+72 s `public/demo.mp4` was re-captured fresh: it shows **only** the
+promoted identity (`tsp1qq2fp8ru…` / `npub1ds2lqjn…`), the seed was
+entered through a password field and the rendered seed element was
+blanked at DOM level before it could paint, and a DOM-level monitor
+asserted zero compromised strings during the capture. The regtest
+proof was regenerated against the dedicated regtest-only receiver
 above.
 
 ## 5. What is deliberately not claimed
