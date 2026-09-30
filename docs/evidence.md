@@ -51,8 +51,9 @@ The app is deployed on GitHub Pages and was exercised live:
 Kind-30078 (NIP-78 parameterized replaceable) events with `d` tag
 `silenttip` were signed and published to public relays:
 
-**Current promoted demo creator** (generated off-camera on 2026-09-28; its
-keys live only in gitignored local state — no private material is committed):
+**Current promoted demo creator** (generated off-camera; binding event
+`created_at` is 2026-09-29T16:29:46Z per the relays; its keys live only in
+gitignored local state — no private material is committed):
 
 - **Event id:** `5a9f1252c63454c7a1b4c604562a725060b0bb0434436d4e16bff9f67c2064f6`
 - **Author:** `npub1ds2lqjnc0u4zghaplaa306t0nz36l3fmzngnvztq5m5d4y9ruxtqy5ejdp`
@@ -149,7 +150,7 @@ network):
   broadcast transaction hex (`txHex`, 468 chars) plus the Esplora-shaped
   decode; `test/regtest.test.ts` re-derives the txid from the hex and
   replays the scan so CI re-verifies everything on every run.
-- Screencast of the run: `public/regtest-proof.mp4` (21 s).
+- Screencast of the run: `public/regtest-proof.mp4`.
 - Reproduce: `node scripts/dist/regtest-e2e.mjs run` against any
   `bitcoin/bitcoin` regtest container (see the script header).
 
@@ -177,10 +178,10 @@ persisted (`src/state.ts` stores only `nostrPubkey`). They are
 unrecoverable, so the burned events will keep serving from relays; the fix
 is exactly this rotation + the in-app warning + honest labeling.
 
-**Video history.** The first 88 s `demo.mp4` showed the burned
+**Video history.** The first `demo.mp4` showed the burned
 `tsp1qq0nekn7…` identity's mnemonic on-screen. A first recut masked the
 seed region but still displayed the burned tsp1/npub, so the current
-72 s `public/demo.mp4` was re-captured fresh: it shows **only** the
+`public/demo.mp4` was re-captured fresh: it shows **only** the
 promoted identity (`tsp1qq2fp8ru…` / `npub1ds2lqjn…`), the seed was
 entered through a password field and the rendered seed element was
 blanked at DOM level before it could paint, and a DOM-level monitor

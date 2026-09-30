@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>SilentTip — 72-second demo</title>
+    <title>SilentTip — demo video</title>
     <meta
       name="description"
       content="Judge-readable walkthrough: publish a Nostr-bound silent-payment identity, resolve it, and see what the chain sees. Signet only."
@@ -50,7 +50,7 @@
     <div class="wrap">
       <header>
         <span class="badge">signet only · no real funds</span>
-        <h1><span class="accent">Silent</span>Tip — 72-second demo</h1>
+        <h1><span class="accent">Silent</span>Tip — demo video</h1>
         <p class="sub">
           A Nostr creator publishes one reusable silent-payment identity; every tip to it lands at a
           fresh on-chain output observers cannot link back to it. Everything below runs on Bitcoin
@@ -81,14 +81,15 @@
         <p style="margin:0; font-size:0.92rem; color: var(--muted)">
           Address reuse is how chain analysis clusters a creator's income. Silent payments fix it at the
           protocol level: the sender does the ECDH work off-chain, so each tip creates a brand-new taproot
-          output. The chain never sees the creator's published address — there is nothing to cluster.
+          output. The chain never sees the creator's published address, so tips cannot be clustered to it by
+          address reuse.
           (Honest limits: sender inputs, change, amounts and timing stay visible, and spending several
           tips together can link those outputs to each other.)
         </p>
       </div>
 
       <p class="note">
-        <b>Broadcast proof on local regtest (21 s):</b> a real BIP-352 tip to a dedicated
+        <b>Broadcast proof on local regtest:</b> a real BIP-352 tip to a dedicated
         regtest-only receiver — built by the repo's own transaction builder, broadcast, mined,
         and found by the repo's own receiver scan — runs end to end on a disposable regtest chain
         below (the transaction builder and scanner are the same code the app uses; UTXO discovery,

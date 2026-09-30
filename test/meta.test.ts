@@ -160,6 +160,17 @@ describe('honesty guardrails', () => {
       ).toBe(false);
     }
   });
+
+  it('no baked-in media durations in copy (labels drifted twice)', () => {
+    // 'Ns'/'N-second' next to a media noun — the artifact is the truth,
+    // so copy must not claim a length. Human-time phrasing ('10 seconds')
+    // is fine and stays unflagged.
+    const dur =
+      /\b\d+\s*s\s+(?:demo|video|walkthrough|screencast|mp4)|\b\d+\s*-\s*second\s+(?:demo|video|walkthrough|screencast)|(?:demo\.mp4|regtest-proof\.mp4)[^.]{0,25}\(\s*\d+\s*s\b/i;
+    for (const [doc, text] of Object.entries(DOCS)) {
+      expect(dur.test(text), `${doc} contains a media-duration claim`).toBe(false);
+    }
+  });
 });
 
 describe('no leaked secrets in committed text artifacts', () => {

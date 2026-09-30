@@ -43,7 +43,7 @@ const CURVE_N = BigInt(
 /** Every public receiver identity that has ever been promoted (current +
  *  rotated/burned). The regtest proof receiver must be none of them. */
 const PROMOTED_TSP1 = [
-  // current promoted creator (fresh, off-camera, published 2026-09-27)
+  // current promoted creator (fresh, off-camera; binding event created_at 2026-09-29T16:29:46Z)
   'tsp1qq2fp8ruh26d3zwqm9ej6u970sw63cg7jz6g5c4ejek85u6sk9nlkyqesam0wxj0x9wpmvwaf7qvhvk3vkzclyuyjdy7p0wplls4x09lz0se02ypg',
   ...BURNED_TSP1,
 ];

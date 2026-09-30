@@ -67,8 +67,7 @@ Signet tip pair has been broadcast yet.
 ## Known weaknesses (no hiding)
 
 - A broadcast silent tip is verified on local **regtest** (disposable coins,
-  same tx builder and scanner — `scripts/regtest-proof.json`, 21 s
-  screencast) but not yet on **signet**: the throwaway wallet needs ~10k
+  same tx builder and scanner — `scripts/regtest-proof.json`, screencast) but not yet on **signet**: the throwaway wallet needs ~10k
   faucet sats that require a human behind a captcha. We state this rather
   than simulate it.
 - The regtest fixture reveals the private keys of its dedicated
@@ -83,6 +82,6 @@ Signet tip pair has been broadcast yet.
 ## If a judge has 30 seconds
 
 1. Open https://sharonbasovich.github.io/silenttip/ — read the one-line hook.
-2. Open https://sharonbasovich.github.io/silenttip/video.html — the 72 s
+2. Open https://sharonbasovich.github.io/silenttip/video.html — the
    walkthrough (restore → resolve → what-the-chain-sees → scan).
 3. Skim `docs/evidence.md` — every claim is linked to a checkable artifact.

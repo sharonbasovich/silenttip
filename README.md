@@ -22,7 +22,7 @@ visible to judges in one click.
 > services. All keys are throwaway test keys generated in your browser.
 
 **Live demo:** https://sharonbasovich.github.io/silenttip/ ·
-**72-second video:** https://sharonbasovich.github.io/silenttip/video.html
+**Demo video:** https://sharonbasovich.github.io/silenttip/video.html
 
 ## Try it
 
@@ -52,11 +52,11 @@ regtest — see `docs/evidence.md` §4b.)
 
 - [`video.html`](video.html) + [`public/demo.mp4`](public/demo.mp4) —
   judge-readable video page (deployed at `/silenttip/video.html`) embedding the
-  ~72 s captioned walkthrough: identity restore → npub resolution →
+  captioned walkthrough: identity restore → npub resolution →
   honest unfunded-broadcast gate → on-chain inspection → block scan. Only the
   promoted demo identity appears; the receiver seed is never shown.
 - [`public/regtest-proof.mp4`](public/regtest-proof.mp4) +
-  [`scripts/regtest-proof.json`](scripts/regtest-proof.json) — 21 s screencast
+  [`scripts/regtest-proof.json`](scripts/regtest-proof.json) — screencast
   and fixture (incl. raw tx hex) of the full send → broadcast → receiver-scan
   run on a local regtest bitcoind ([`scripts/regtest-e2e.ts`](scripts/regtest-e2e.ts);
   disposable keys/coins only, dedicated regtest-only receiver, honestly labeled

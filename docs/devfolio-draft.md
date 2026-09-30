@@ -70,7 +70,7 @@ of scope.)
 - **Signet is easy to describe and hard to fund.** Every public faucet was
   login-, CAPTCHA-, or Cloudflare-gated during the build, so we proved the
   identical broadcast pipeline on a local regtest chain
-  (`scripts/regtest-proof.json` + 21 s screencast, honestly labeled) and
+  (`scripts/regtest-proof.json` + screencast, honestly labeled) and
   left the signet broadcast gated on a human faucet run —
   `docs/evidence.md` states this explicitly rather than papering over it.
 - **The replay fixture is intentionally public.** Its disposable receiver

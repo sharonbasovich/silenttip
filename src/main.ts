@@ -28,7 +28,7 @@ app.append(
     el('p', { class: 'tagline muted' },
       'Sender inputs, change, amounts and timing stay visible; co-spending tips can link them.'),
     el('p', { class: 'tagline links' },
-      el('a', { href: './video.html' }, 'Watch the 72-second demo'), ' · ',
+      el('a', { href: './video.html' }, 'Watch the demo video'), ' · ',
       el('a', { href: 'https://github.com/sharonbasovich/silenttip', target: '_blank', rel: 'noopener' }, 'Source'), ' · ',
       el('a', { href: 'https://github.com/sharonbasovich/silenttip/blob/main/docs/evidence.md', target: '_blank', rel: 'noopener' }, 'Verified evidence')),
   ),
