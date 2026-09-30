@@ -55,10 +55,14 @@ of scope.)
 - Esplora (`mempool.space/signet/api`) for chain reads and broadcast.
 - Pure static site (Vite + TypeScript) — no server, no custody, every crypto
   step runs in the browser tab.
-- `scripts/signet-e2e.ts` runs the same pipeline headlessly for CI-grade
-  end-to-end verification; `scripts/regtest-e2e.ts` proves the identical
-  send → broadcast → receiver-scan path on a local regtest bitcoind
-  (recorded in `public/regtest-proof.mp4`, replayed in `test/regtest.test.ts`).
+- `scripts/signet-e2e.ts` exercises the same pipeline headlessly;
+  `scripts/regtest-e2e.ts` proves the transaction derivation, signing and
+  receiver-scan logic end to end on a local regtest bitcoind — the tx
+  builder and scanner are shared, while UTXO discovery, broadcast
+  transport and block fetching differ from the signet path. The run is
+  recorded in `public/regtest-proof.mp4` and replayed from the committed
+  fixture in `test/regtest.test.ts`; a full re-run needs Docker plus the
+  gitignored sender state.
 
 ## Challenges we ran into
 
@@ -69,9 +73,10 @@ of scope.)
   the ECDH/output/scan loops against `bitcoin/bips` `reference.py`.
 - **Signet is easy to describe and hard to fund.** Every public faucet was
   login-, CAPTCHA-, or Cloudflare-gated during the build, so we proved the
-  identical broadcast pipeline on a local regtest chain
-  (`scripts/regtest-proof.json` + screencast, honestly labeled) and
-  left the signet broadcast gated on a human faucet run —
+  transaction derivation, signing and receiver-scan logic on a local
+  regtest chain (`scripts/regtest-proof.json` + screencast, honestly
+  labeled — a re-run needs Docker plus the gitignored sender state) and
+  left the public signet broadcast gated on a human faucet run —
   `docs/evidence.md` states this explicitly rather than papering over it.
 - **The replay fixture is intentionally public.** Its disposable receiver
   private keys are committed so judges can reproduce the regtest scan; that
