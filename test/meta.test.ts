@@ -49,6 +49,8 @@ const repoFiles = new Set(
     p.startsWith('../') ? p.slice(3) : p.startsWith('./') ? `test/${p.slice(2)}` : p,
   ),
 );
+// import.meta.glob never matches the importing file itself
+repoFiles.add('test/meta.test.ts');
 
 function referencedPaths(text: string): string[] {
   const out: string[] = [];

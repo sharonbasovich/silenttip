@@ -8,7 +8,7 @@ All 28 official send-and-receive test vectors from `bitcoin/bips` (BIP-352)
 pass against the implementation in `src/sp/outputs.ts` + `src/sp/scan.ts`:
 
 ```
-npm test          # 87 tests, all green
+npm test          # 88 tests, all green
 ```
 
 `test/vectors.test.ts` consumes the vendored vector file
@@ -188,6 +188,17 @@ blanked at DOM level before it could paint, and a DOM-level monitor
 asserted zero compromised strings during the capture. The regtest
 proof was regenerated against the dedicated regtest-only receiver
 above.
+
+A second full-frame OCR pass (2026-09-30) still found one frame
+flashing a burned identity, and the video began on a blank browser
+tab — so the walkthrough was **re-recorded again on the deployed
+site**: it starts on the product, uses only the promoted identity
+plus a fresh throwaway sender, keeps the seed behind the same
+password field + DOM-level blanking, and every one of the 1,782
+exported frames was scanned with Tesseract OCR for the burned
+tsp1s/npubs, `nsec`, WIF keys, the exposed mnemonic and every word
+of the promoted mnemonic — zero hits. The check is manual; binary
+video frames cannot be covered by `test/meta.test.ts`.
 
 ## 5. What is deliberately not claimed
 
