@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { TipFlow, type TipDeps, type TipEvent } from '../src/ui/tipFlow';
+import { TipFlow, TipFlowHost, type TipDeps, type TipEvent } from '../src/ui/tipFlow';
 import type { ResolvedBinding } from '../src/nostr/binding';
 import type { EsploraUtxo } from '../src/chain/esplora';
 import type { SendPlan, SenderWallet } from '../src/sp/send';
@@ -280,6 +280,38 @@ describe('TipFlow send', () => {
     expect(ofType(events, 'send-error').at(-1)?.message).toBe('No UTXOs — fund the sender address first');
   });
 
+  it.each(['QuotaExceededError', 'SecurityError'])(
+    'a %s persistence failure keeps the accepted broadcast as success',
+    async (errName) => {
+      let calls = 0;
+      const { flow, deps, events, sent } = harness({
+        onSentTip: () => { throw new Error(errName); },
+        getAddressUtxos: vi.fn(async () =>
+          (++calls === 1 ? [UTXO_A] : Promise.reject(new Error('esplora down')))),
+      });
+      flow.setWallet(WALLET_A);
+      await flow.refreshUtxos();
+      await flow.resolve('npubA');
+
+      await flow.send({ sats: 1000, staticTip: false });
+      // broadcast accepted → reported as success carrying a storage warning
+      const sentEvents = ofType(events, 'sent-silent');
+      expect(sentEvents).toHaveLength(1);
+      expect(sentEvents[0].storageError).toBe(errName);
+      expect(ofType(events, 'send-error')).toHaveLength(0);
+      expect(sent).toHaveLength(0);            // nothing persisted
+      // lock released for the next operation
+      expect(flow.sending).toBe(false);
+      expect(ofType(events, 'send-busy').at(-1)?.busy).toBe(false);
+      // spent inputs invalidated even though persistence threw — no reuse
+      expect(flow.utxoList).toHaveLength(0);
+      await flow.send({ sats: 1000, staticTip: false });
+      expect(deps.broadcastTx).toHaveBeenCalledTimes(1);
+      expect(ofType(events, 'send-error').at(-1)?.message)
+        .toBe('No UTXOs — fund the sender address first');
+    },
+  );
+
   it('recovers after a broadcast failure — the next send works', async () => {
     const bc = vi.fn()
       .mockRejectedValueOnce(new Error('broadcast rejected'))
@@ -313,6 +345,59 @@ describe('TipFlow send', () => {
 
     expect(deps.buildStaticTipTx).toHaveBeenCalledWith(WALLET_A, [UTXO_A], 1000, 3);
     expect(sent[0]).toMatchObject({ kind: 'static', to: WALLET_A.address });
+  });
+});
+
+describe('TipFlow remount (TipFlowHost)', () => {
+  it('a second mount shares the in-flight send — navigation cannot double-tip', async () => {
+    // Faithful equivalent of main.ts show(tab): the panel is re-rendered and
+    // a new renderer mounts while the previous mount's send is still pending.
+    const fees = deferred<Record<string, number>>();
+    const { deps, events: evA } = harness({ getFeeEstimates: vi.fn(() => fees.p) });
+    const host = new TipFlowHost(deps);
+    const f1 = host.mount((e) => evA.push(e));
+
+    f1.setWallet(WALLET_A);
+    await f1.refreshUtxos();
+    await f1.resolve('npubA');
+    const sendP = f1.send({ sats: 1000, staticTip: false }); // pending on fees
+
+    // navigate away and back: remount re-targets events, keeps one flow
+    const evB: TipEvent[] = [];
+    const f2 = host.mount((e) => evB.push(e));
+    expect(f2).toBe(f1);
+    expect(f2.sending).toBe(true);             // in-flight survives the mount
+    // restore data keeps the fresh input consistent with the resolution
+    expect(f2.boundInputText).toBe('npubA');
+    expect(f2.bindingView).toMatchObject({ kind: 'verified', sp: SP_A });
+
+    await f2.send({ sats: 1000, staticTip: false }); // second click on new mount
+    fees.res({ '6': 2 });
+    await sendP;
+    await flush();
+    expect(deps.broadcastTx).toHaveBeenCalledTimes(1);
+    // completion delivered to the CURRENT renderer, not the dead one
+    expect(ofType(evB, 'sent-silent')).toHaveLength(1);
+    expect(ofType(evA, 'sent-silent')).toHaveLength(0);
+    expect(f2.lastSendOutcome?.type).toBe('sent-silent');
+  });
+
+  it('a mount after a completed send replays the last outcome', async () => {
+    const { deps, events: evA } = harness();
+    const host = new TipFlowHost(deps);
+    const f1 = host.mount((e) => evA.push(e));
+    f1.setWallet(WALLET_A);
+    await f1.refreshUtxos();
+    await f1.resolve('npubA');
+    await f1.send({ sats: 1000, staticTip: false });
+    expect(f1.lastSendOutcome?.type).toBe('sent-silent');
+
+    const evB: TipEvent[] = [];
+    const f2 = host.mount((e) => evB.push(e));
+    // fresh DOM can replay the exact last outcome event
+    if (f2.lastSendOutcome) evB.push(f2.lastSendOutcome);
+    expect(ofType(evB, 'sent-silent')).toHaveLength(1);
+    expect(f2.walletAddress).toBe(WALLET_A.address);
   });
 });
 

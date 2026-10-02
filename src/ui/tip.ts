@@ -21,7 +21,23 @@ import {
 } from '../chain/esplora';
 import { addSentTip, loadState, saveState } from '../state';
 import { isBurnedSp } from '../sp/burned';
-import { TipFlow, type BindingView, type TipEvent } from './tipFlow';
+import { TipFlowHost, type BindingView, type TipEvent } from './tipFlow';
+
+// Session-scoped: tab navigation remounts this panel, but in-flight sends and
+// resolutions must survive it — see TipFlowHost.
+const tipHost = new TipFlowHost({
+  resolveIdentifier,
+  fetchBinding,
+  isSignetSpAddress,
+  isBurnedSp,
+  getAddressUtxos,
+  getFeeEstimates,
+  broadcastTx,
+  buildSilentTipTx,
+  buildStaticTipTx,
+  onSentTip: addSentTip,
+  relays: DEFAULT_RELAYS,
+});
 
 export function renderTip(root: HTMLElement): void {
   const panel = el('section', { class: 'panel' });
@@ -60,22 +76,7 @@ export function renderTip(root: HTMLElement): void {
   const sendStatus = statusEl();
   const sendBox = el('div');
 
-  const flow = new TipFlow(
-    {
-      resolveIdentifier,
-      fetchBinding,
-      isSignetSpAddress,
-      isBurnedSp,
-      getAddressUtxos,
-      getFeeEstimates,
-      broadcastTx,
-      buildSilentTipTx,
-      buildStaticTipTx,
-      onSentTip: addSentTip,
-      relays: DEFAULT_RELAYS,
-    },
-    onFlowEvent,
-  );
+  const flow = tipHost.mount(onFlowEvent);
 
   function renderBindingView(b: BindingView): void {
     bindingBox.replaceChildren();
@@ -106,6 +107,21 @@ export function renderTip(root: HTMLElement): void {
     }
   }
 
+  function renderWalletBox(address: string | null, utxos: EsploraUtxo[] | null): void {
+    walletBox.replaceChildren();
+    if (!address) return;
+    walletBox.append(el('label', {}, 'Sender address (fund me)'), copyable(address));
+    if (utxos) {
+      const total = utxos.reduce((s, u) => s + u.value, 0);
+      walletBox.append(
+        el('p', { class: 'small' },
+          `Balance: ${total.toLocaleString()} sats across ${utxos.length} UTXO(s)`),
+        el('p', { class: 'small muted' },
+          'Faucets: signetfaucet.com · bitcoinsignetfaucet.com · mempool.space signet faucet'),
+      );
+    }
+  }
+
   function setSendBusy(busy: boolean): void {
     for (const c of [idInput, resolveBtn, amountInput, staticChk, sendBtn, wifInput, genWBtn, importBtn]) {
       c.disabled = busy;
@@ -131,26 +147,16 @@ export function renderTip(root: HTMLElement): void {
         resolveStatus.err(evt.message);
         break;
       case 'wallet-changed':
-        walletBox.replaceChildren();
         walletStatus.el.textContent = '';
-        if (evt.address) {
-          walletBox.append(el('label', {}, 'Sender address (fund me)'), copyable(evt.address));
-        }
+        renderWalletBox(evt.address, null);
         break;
       case 'utxos-pending':
         walletStatus.ok('Fetching UTXOs…');
         break;
-      case 'utxos-applied': {
-        const total = evt.utxos.reduce((s, u) => s + u.value, 0);
-        walletBox.append(
-          el('p', { class: 'small' },
-            `Balance: ${total.toLocaleString()} sats across ${evt.utxos.length} UTXO(s)`),
-          el('p', { class: 'small muted' },
-            'Faucets: signetfaucet.com · bitcoinsignetfaucet.com · mempool.space signet faucet'),
-        );
+      case 'utxos-applied':
+        renderWalletBox(evt.address, evt.utxos);
         walletStatus.el.textContent = '';
         break;
-      }
       case 'utxos-error':
         walletStatus.err(evt.message);
         break;
@@ -163,6 +169,10 @@ export function renderTip(root: HTMLElement): void {
       case 'sent-static':
         sendBox.append(el('p', {}, 'Static tip broadcast: ', txidLink(evt.txid)));
         sendStatus.ok('Static tip sent — see it in "What the chain sees".');
+        if (evt.storageError) {
+          sendBox.append(el('p', { class: 'small muted' },
+            `Note: tip history could not be saved locally (${evt.storageError})`));
+        }
         break;
       case 'sent-silent':
         sendBox.append(
@@ -171,6 +181,10 @@ export function renderTip(root: HTMLElement): void {
             `fee ${evt.fee} sats · ${evt.inputCount} input(s) · SP output index ${evt.silentOutputIndexes.join(', ')}`),
         );
         sendStatus.ok('Broadcast accepted.');
+        if (evt.storageError) {
+          sendBox.append(el('p', { class: 'small muted' },
+            `Note: tip history could not be saved locally (${evt.storageError})`));
+        }
         break;
     }
   }
@@ -233,6 +247,19 @@ export function renderTip(root: HTMLElement): void {
       staticChk, ' send a static-address tip instead (builds the comparison cluster)'),
     sendBtn, sendStatus.el, sendBox,
   );
+
+  // Re-mount restore: the session-scoped flow may hold a resolution, wallet,
+  // in-flight send or last outcome from before this panel's DOM was replaced.
+  // Restoring the bound input text keeps the visible field consistent with
+  // the validated recipient it refers to.
+  const boundText = flow.boundInputText;
+  if (boundText) {
+    idInput.value = boundText;
+    if (flow.bindingView) renderBindingView(flow.bindingView);
+  }
+  renderWalletBox(flow.walletAddress, flow.utxoList.length ? [...flow.utxoList] : null);
+  if (flow.sending) setSendBusy(true);
+  if (flow.lastSendOutcome) onFlowEvent(flow.lastSendOutcome);
 }
 
 function npubShort(hex: string): string {

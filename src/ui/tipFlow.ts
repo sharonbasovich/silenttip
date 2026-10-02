@@ -64,7 +64,7 @@ export type TipEvent =
   | { type: 'utxos-error'; address: string; message: string }
   | { type: 'send-busy'; busy: boolean }
   | { type: 'send-error'; message: string }
-  | { type: 'sent-static'; txid: string; to: string; amountSats: number }
+  | { type: 'sent-static'; txid: string; to: string; amountSats: number; storageError?: string }
   | {
       type: 'sent-silent';
       txid: string;
@@ -73,6 +73,7 @@ export type TipEvent =
       fee: number;
       inputCount: number;
       silentOutputIndexes: number[];
+      storageError?: string;
     };
 
 interface Resolution {
@@ -91,11 +92,22 @@ export class TipFlow {
   private wallet: SenderWallet | null = null;
   private utxos: EsploraUtxo[] = [];
   private inFlight = false;
+  private lastApplied: BindingView | null = null;
+  private lastOutcome: TipEvent | null = null;
 
   constructor(
     private readonly deps: TipDeps,
-    private readonly emit: (evt: TipEvent) => void,
+    private emit: (evt: TipEvent) => void,
   ) {}
+
+  /**
+   * Re-target event delivery after a UI remount. The controller outlives the
+   * DOM (it is session-scoped via TipFlowHost), so a fresh renderer is attached
+   * on every mount.
+   */
+  setEmitter(emit: (evt: TipEvent) => void): void {
+    this.emit = emit;
+  }
 
   /** Current validated recipient, or null when none/dirty/burned. */
   get resolvedSp(): string | null {
@@ -118,6 +130,23 @@ export class TipFlow {
     return this.utxos;
   }
 
+  /** The input text bound to the current resolution or in-flight resolve —
+   *  for restoring the recipient field on remount so it can't diverge from
+   *  the resolution invisibly. */
+  get boundInputText(): string | null {
+    return this.pendingResolve?.input ?? this.resolution?.input ?? null;
+  }
+
+  /** Last applied binding view (for re-rendering on remount). */
+  get bindingView(): BindingView | null {
+    return this.lastApplied;
+  }
+
+  /** Most recent sent or send-error event (for re-rendering on remount). */
+  get lastSendOutcome(): TipEvent | null {
+    return this.lastOutcome;
+  }
+
   /**
    * Called on every recipient-field edit. Editing away from the bound input
    * drops the current resolution and cancels any in-flight resolve, so a
@@ -134,6 +163,7 @@ export class TipFlow {
     if (this.resolution && input !== this.resolution.input) {
       this.resolveSeq++;
       this.resolution = null;
+      this.lastApplied = null;
       this.emit({ type: 'resolve-cleared', reason: 'edited' });
     }
   }
@@ -144,6 +174,7 @@ export class TipFlow {
     const seq = ++this.resolveSeq;
     this.pendingResolve = { seq, input };
     this.resolution = null;
+    this.lastApplied = null;
     this.emit({ type: 'resolve-cleared', reason: 'new-resolve' });
     const stale = () => seq !== this.resolveSeq;
     // Only the request that owns the pending slot may clear it — a stale
@@ -158,10 +189,12 @@ export class TipFlow {
         done();
         const burned = this.deps.isBurnedSp(input);
         this.resolution = burned ? null : { sp: input, input, verified: false };
+        const binding: BindingView = { kind: 'direct', sp: input, burned };
+        this.lastApplied = binding;
         this.emit({
           type: 'resolve-applied',
           input,
-          binding: { kind: 'direct', sp: input, burned },
+          binding,
           resolvedSp: this.resolvedSp,
         });
         return;
@@ -179,18 +212,20 @@ export class TipFlow {
         throw new Error(`Binding is for "${res.binding.network}", this demo is signet-only`);
       const burned = this.deps.isBurnedSp(res.binding.sp);
       this.resolution = burned ? null : { sp: res.binding.sp, input, verified: true };
+      const binding: BindingView = {
+        kind: 'verified',
+        sp: res.binding.sp,
+        burned,
+        pubkey,
+        eventId: res.event.id,
+        eventKind: res.event.kind,
+        createdAt: res.event.created_at,
+      };
+      this.lastApplied = binding;
       this.emit({
         type: 'resolve-applied',
         input,
-        binding: {
-          kind: 'verified',
-          sp: res.binding.sp,
-          burned,
-          pubkey,
-          eventId: res.event.id,
-          eventKind: res.event.kind,
-          createdAt: res.event.created_at,
-        },
+        binding,
         resolvedSp: this.resolvedSp,
       });
     } catch (e) {
@@ -239,7 +274,11 @@ export class TipFlow {
     const utxos = this.utxos.slice();
     const resolution = this.resolution;
 
-    const fail = (message: string) => this.emit({ type: 'send-error', message });
+    const outcome = (evt: TipEvent) => {
+      this.lastOutcome = evt;
+      this.emit(evt);
+    };
+    const fail = (message: string) => outcome({ type: 'send-error', message });
     if (!Number.isFinite(sats) || sats < 546) return fail('Amount must be ≥ 546 sats');
     if (!wallet) return fail('Set up the sender wallet first');
     if (!utxos.length) return fail('No UTXOs — fund the sender address first');
@@ -247,6 +286,7 @@ export class TipFlow {
     if (!staticTip && !spAddress) return fail('Resolve a recipient first');
 
     this.inFlight = true;
+    this.lastOutcome = null;
     this.emit({ type: 'send-busy', busy: true });
     try {
       const fees = await this.deps.getFeeEstimates();
@@ -273,9 +313,20 @@ export class TipFlow {
         to = spAddress;
       }
       const txid = await this.deps.broadcastTx(txHex);
-      this.deps.onSentTip({ txid, kind, amountSats: sats, to, at: Date.now() });
+      // Invalidate possibly-spent inputs FIRST — persistence is best-effort
+      // and may throw (e.g. localStorage QuotaExceededError), which must not
+      // leave a stale spendable set behind.
+      if (this.wallet === wallet) this.utxos = [];
+      let storageError: string | undefined;
+      try {
+        this.deps.onSentTip({ txid, kind, amountSats: sats, to, at: Date.now() });
+      } catch (e) {
+        // The broadcast already succeeded — a persistence failure is a
+        // warning on the success, never a send failure.
+        storageError = (e as Error).message;
+      }
       if (plan) {
-        this.emit({
+        outcome({
           type: 'sent-silent',
           txid,
           to,
@@ -283,9 +334,10 @@ export class TipFlow {
           fee: plan.fee,
           inputCount: plan.inputs.length,
           silentOutputIndexes: plan.silentOutputIndexes,
+          storageError,
         });
       } else {
-        this.emit({ type: 'sent-static', txid, to, amountSats: sats });
+        outcome({ type: 'sent-static', txid, to, amountSats: sats, storageError });
       }
       // Post-broadcast balance refresh is best-effort: its failure must not
       // mask a successful send, so it reports through utxos-error only. The
@@ -293,15 +345,36 @@ export class TipFlow {
       // spent — so it is invalidated before refreshing, and a failed refresh
       // leaves it empty (the next send then fails the "No UTXOs" gate rather
       // than building on spent inputs).
-      if (this.wallet === wallet) {
-        this.utxos = [];
-        await this.refreshUtxos();
-      }
+      if (this.wallet === wallet) await this.refreshUtxos();
     } catch (e) {
-      this.emit({ type: 'send-error', message: (e as Error).message });
+      outcome({ type: 'send-error', message: (e as Error).message });
     } finally {
       this.inFlight = false;
       this.emit({ type: 'send-busy', busy: false });
     }
+  }
+}
+
+/**
+ * Session-scoped owner of the TipFlow. The Tip tab re-renders on every
+ * navigation (main.ts `show()` clears content and calls renderTip), and a
+ * fresh controller would lose `inFlight`, letting a second send run
+ * concurrently. The host keeps one flow for the page session and re-targets
+ * its emitter to the newest renderer on each mount; the mount then replays
+ * the flow's public state (boundInputText, bindingView, sending,
+ * lastSendOutcome) into the fresh DOM.
+ */
+export class TipFlowHost {
+  private flow: TipFlow | null = null;
+
+  constructor(private readonly deps: TipDeps) {}
+
+  mount(renderer: (evt: TipEvent) => void): TipFlow {
+    if (!this.flow) {
+      this.flow = new TipFlow(this.deps, renderer);
+    } else {
+      this.flow.setEmitter(renderer);
+    }
+    return this.flow;
   }
 }
