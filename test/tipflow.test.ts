@@ -56,7 +56,7 @@ interface Harness {
   sent: StoredTip[];
 }
 
-function harness(overrides: Partial<TipDeps> = {}): Harness {
+function harness(overrides: Partial<TipDeps> = {}, onEmit?: (e: TipEvent) => void): Harness {
   const events: TipEvent[] = [];
   const sent: StoredTip[] = [];
   const deps: TipDeps = {
@@ -73,7 +73,9 @@ function harness(overrides: Partial<TipDeps> = {}): Harness {
     relays: ['wss://relay.example'],
     ...overrides,
   };
-  return { deps, events, sent, flow: new TipFlow(deps, (e) => events.push(e)) };
+  // onEmit simulates a faulting renderer: it runs inside the emitter call and
+  // may throw — the flow must swallow that (notify) without corrupting state.
+  return { deps, events, sent, flow: new TipFlow(deps, (e) => { events.push(e); onEmit?.(e); }) };
 }
 
 function ofType<T extends TipEvent['type']>(
@@ -402,6 +404,87 @@ describe('TipFlow remount (TipFlowHost)', () => {
   });
 });
 
+describe('renderer (emitter) faults', () => {
+  it.each(['silent', 'static'] as const)(
+    'a throwing sent-%s emitter preserves the accepted success and still refreshes',
+    async (kind) => {
+      let utxoCalls = 0;
+      const { flow, deps, events } = harness(
+        {
+          getAddressUtxos: vi.fn(async () => (++utxoCalls === 1 ? [UTXO_A] : [UTXO_C])),
+        },
+        (e) => {
+          if (e.type === 'sent-static' || e.type === 'sent-silent')
+            throw new Error('render crashed');
+        },
+      );
+      flow.setWallet(WALLET_A);
+      await flow.refreshUtxos();
+      await flow.resolve('npubA');
+      await flow.send({ sats: 1000, staticTip: kind === 'static' });
+
+      expect(deps.broadcastTx).toHaveBeenCalledTimes(1);
+      expect(ofType(events, 'send-error')).toHaveLength(0); // never mislabeled
+      expect(flow.sending).toBe(false);                     // lock released
+      expect(utxoCalls).toBe(2);                            // post-send refresh ran
+      expect(flow.utxoList).toEqual([UTXO_C]);
+      // outcome stays accurate → replayable on a healthy remount
+      const sentType = kind === 'static' ? 'sent-static' : 'sent-silent';
+      expect(flow.lastSendOutcome?.type).toBe(sentType);
+      const evB: TipEvent[] = [];
+      flow.setEmitter((e) => evB.push(e));
+      if (flow.lastSendOutcome) evB.push(flow.lastSendOutcome);
+      expect(ofType(evB, sentType)).toHaveLength(1);
+    },
+  );
+
+  it('a throwing busy-release emitter still releases the lock', async () => {
+    let utxoCalls = 0;
+    const { flow, deps, events } = harness(
+      {
+        getAddressUtxos: vi.fn(async () => (++utxoCalls === 1 ? [UTXO_A] : [UTXO_C])),
+      },
+      (e) => {
+        if (e.type === 'send-busy' && !e.busy) throw new Error('render crashed');
+      },
+    );
+    flow.setWallet(WALLET_A);
+    await flow.refreshUtxos();
+    await flow.resolve('npubA');
+    await flow.send({ sats: 1000, staticTip: false });      // must resolve, not reject
+
+    expect(flow.sending).toBe(false);
+    expect(flow.lastSendOutcome?.type).toBe('sent-silent');
+    expect(ofType(events, 'send-error')).toHaveLength(0);
+    // lock truly released — a follow-up send on fresh inputs runs
+    await flow.send({ sats: 600, staticTip: false });
+    expect(deps.broadcastTx).toHaveBeenCalledTimes(2);
+  });
+
+  it('a throwing success emitter plus storage failure still reports accepted success', async () => {
+    const { flow, events } = harness(
+      {
+        onSentTip: () => { throw new Error('QuotaExceededError'); },
+        getAddressUtxos: vi.fn(async () => [UTXO_A]),  // spent echo on refresh
+      },
+      (e) => {
+        if (e.type === 'sent-silent') throw new Error('render crashed');
+      },
+    );
+    flow.setWallet(WALLET_A);
+    await flow.refreshUtxos();
+    await flow.resolve('npubA');
+    await flow.send({ sats: 1000, staticTip: false });
+
+    const sent = ofType(events, 'sent-silent');
+    expect(sent).toHaveLength(1);
+    expect(sent[0].storageError).toBe('QuotaExceededError');
+    expect(ofType(events, 'send-error')).toHaveLength(0);
+    expect(flow.lastSendOutcome?.type).toBe('sent-silent');
+    expect(flow.utxoList).toHaveLength(0);                  // spent echo filtered
+  });
+});
+
 describe('saved-WIF remount (same-address wallet object)', () => {
   it('same-address restore is a no-op and preserves a pending refresh', async () => {
     const slow = deferred<EsploraUtxo[]>();
@@ -507,6 +590,40 @@ describe('saved-WIF remount (same-address wallet object)', () => {
     // no retry, no rebuild on spent inputs
     await flow.send({ sats: 1000, staticTip: true });
     expect(deps.broadcastTx).toHaveBeenCalledTimes(1);
+    expect(ofType(events, 'send-error').at(-1)?.message)
+      .toBe('No UTXOs — fund the sender address first');
+  });
+});
+
+describe('A→B→A same-address wallet object swap', () => {
+  it('spent inputs cannot be reused after a mid-send swap', async () => {
+    const bc = deferred<string>();
+    const { flow, deps, events } = harness({
+      broadcastTx: vi.fn(() => bc.p),
+      // indexer keeps echoing the soon-spent input for A's address
+      getAddressUtxos: vi.fn(async (addr: string) =>
+        addr === WALLET_B.address ? [UTXO_B] : [UTXO_A]),
+    });
+    flow.setWallet(WALLET_A);
+    await flow.refreshUtxos();
+    await flow.resolve('npubA');
+    const sendP = flow.send({ sats: 1000, staticTip: false }); // pending broadcast
+    await flush();
+
+    flow.setWallet(WALLET_B);                        // swap away mid-flight
+    await flow.refreshUtxos();
+    flow.setWallet({ ...WALLET_A });                 // back to A — new object
+    await flow.refreshUtxos();                       // echoes spent-soon input
+    expect(flow.utxoList).toEqual([UTXO_A]);
+
+    bc.res('txid-' + '9'.repeat(58));
+    await sendP;
+    await flush();
+
+    expect(ofType(events, 'sent-silent')).toHaveLength(1);
+    expect(flow.utxoList).toHaveLength(0);           // unconditional spent filter
+    await flow.send({ sats: 1000, staticTip: false });
+    expect(deps.broadcastTx).toHaveBeenCalledTimes(1); // no retry on spent inputs
     expect(ofType(events, 'send-error').at(-1)?.message)
       .toBe('No UTXOs — fund the sender address first');
   });

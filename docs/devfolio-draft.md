@@ -49,7 +49,7 @@ of scope.)
   (`src/sp/outputs.ts`) where the upstream library diverges from the
   reference implementation (K_max, point-at-infinity edge cases).
 - Verified against **all 28 official BIP-352 send-and-receive test vectors**
-  plus unit tests (111 green in CI).
+  plus unit tests (116 green in CI).
 - Nostr binding via `nostr-tools`: kind 30078, `d` = `silenttip` —
   parameterized-replaceable, so re-publishing rotates the address.
 - Esplora (`mempool.space/signet/api`) for chain reads and broadcast.

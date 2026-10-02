@@ -112,6 +112,19 @@ export class TipFlow {
     this.emit = emit;
   }
 
+  /**
+   * Deliver an event to the current renderer. A faulting renderer must never
+   * corrupt flow state — its error is swallowed here, so e.g. a crash while
+   * rendering a broadcast success can no longer masquerade as a send failure,
+   * skip the post-send refresh, or corrupt lastSendOutcome (which stays
+   * accurate for replay on a healthy remount).
+   */
+  private notify(evt: TipEvent): void {
+    try {
+      this.emit(evt);
+    } catch { /* renderer fault — state stays authoritative */ }
+  }
+
   /** Current validated recipient, or null when none/dirty/burned. */
   get resolvedSp(): string | null {
     return this.resolution?.sp ?? null;
@@ -160,14 +173,14 @@ export class TipFlow {
     if (this.pendingResolve !== null && input !== this.pendingResolve.input) {
       this.resolveSeq++;
       this.pendingResolve = null;
-      this.emit({ type: 'resolve-cleared', reason: 'edited' });
+      this.notify({ type: 'resolve-cleared', reason: 'edited' });
       return;
     }
     if (this.resolution && input !== this.resolution.input) {
       this.resolveSeq++;
       this.resolution = null;
       this.lastApplied = null;
-      this.emit({ type: 'resolve-cleared', reason: 'edited' });
+      this.notify({ type: 'resolve-cleared', reason: 'edited' });
     }
   }
 
@@ -178,7 +191,7 @@ export class TipFlow {
     this.pendingResolve = { seq, input };
     this.resolution = null;
     this.lastApplied = null;
-    this.emit({ type: 'resolve-cleared', reason: 'new-resolve' });
+    this.notify({ type: 'resolve-cleared', reason: 'new-resolve' });
     const stale = () => seq !== this.resolveSeq;
     // Only the request that owns the pending slot may clear it — a stale
     // request finishing (success or error) must never drop a newer one's
@@ -194,7 +207,7 @@ export class TipFlow {
         this.resolution = burned ? null : { sp: input, input, verified: false };
         const binding: BindingView = { kind: 'direct', sp: input, burned };
         this.lastApplied = binding;
-        this.emit({
+        this.notify({
           type: 'resolve-applied',
           input,
           binding,
@@ -204,7 +217,7 @@ export class TipFlow {
       }
       const pubkey = await this.deps.resolveIdentifier(input);
       if (stale()) return;
-      this.emit({ type: 'resolve-progress', input, message: 'Resolving binding from relays…' });
+      this.notify({ type: 'resolve-progress', input, message: 'Resolving binding from relays…' });
       const res = await this.deps.fetchBinding(pubkey, this.deps.relays);
       if (stale()) return;
       done();
@@ -225,7 +238,7 @@ export class TipFlow {
         createdAt: res.event.created_at,
       };
       this.lastApplied = binding;
-      this.emit({
+      this.notify({
         type: 'resolve-applied',
         input,
         binding,
@@ -234,7 +247,7 @@ export class TipFlow {
     } catch (e) {
       if (stale()) return;
       done();
-      this.emit({ type: 'resolve-error', input, message: (e as Error).message });
+      this.notify({ type: 'resolve-error', input, message: (e as Error).message });
     }
   }
 
@@ -250,7 +263,7 @@ export class TipFlow {
     this.walletGen++;
     this.refreshSeq++;
     this.utxos = [];
-    this.emit({ type: 'wallet-changed', address: wallet?.address ?? null });
+    this.notify({ type: 'wallet-changed', address: wallet?.address ?? null });
   }
 
   /** Fetch UTXOs for the current wallet; results apply only while it stays current. */
@@ -259,7 +272,7 @@ export class TipFlow {
     if (!wallet) return;
     const gen = this.walletGen;
     const seq = ++this.refreshSeq;
-    this.emit({ type: 'utxos-pending', address: wallet.address });
+    this.notify({ type: 'utxos-pending', address: wallet.address });
     try {
       const fetched = await this.deps.getAddressUtxos(wallet.address);
       if (gen !== this.walletGen || seq !== this.refreshSeq) return;
@@ -267,10 +280,10 @@ export class TipFlow {
       // outpoints, they can never un-spend, so filter them for the session.
       const utxos = fetched.filter((u) => !this.spentOutpoints.has(`${u.txid}:${u.vout}`));
       this.utxos = utxos;
-      this.emit({ type: 'utxos-applied', address: wallet.address, utxos });
+      this.notify({ type: 'utxos-applied', address: wallet.address, utxos });
     } catch (e) {
       if (gen !== this.walletGen || seq !== this.refreshSeq) return;
-      this.emit({ type: 'utxos-error', address: wallet.address, message: (e as Error).message });
+      this.notify({ type: 'utxos-error', address: wallet.address, message: (e as Error).message });
     }
   }
 
@@ -288,7 +301,7 @@ export class TipFlow {
 
     const outcome = (evt: TipEvent) => {
       this.lastOutcome = evt;
-      this.emit(evt);
+      this.notify(evt);
     };
     const fail = (message: string) => outcome({ type: 'send-error', message });
     if (!Number.isFinite(sats) || sats < 546) return fail('Amount must be ≥ 546 sats');
@@ -299,7 +312,7 @@ export class TipFlow {
 
     this.inFlight = true;
     this.lastOutcome = null;
-    this.emit({ type: 'send-busy', busy: true });
+    this.notify({ type: 'send-busy', busy: true });
     try {
       const fees = await this.deps.getFeeEstimates();
       const rate = Math.max(1, Math.ceil(fees['6'] ?? 1));
@@ -335,7 +348,10 @@ export class TipFlow {
       // and may throw (e.g. localStorage QuotaExceededError) — a failure must
       // not leave a stale spendable set behind.
       for (const u of spentInputs) this.spentOutpoints.add(`${u.txid}:${u.vout}`);
-      if (this.wallet === wallet) this.utxos = [];
+      // Drop spent inputs from the live cache unconditionally — the current
+      // wallet may be a fresh object for the same address (A→B→A re-import),
+      // so object identity is not a reliable gate here.
+      this.utxos = this.utxos.filter((u) => !this.spentOutpoints.has(`${u.txid}:${u.vout}`));
       let storageError: string | undefined;
       try {
         this.deps.onSentTip({ txid, kind, amountSats: sats, to, at: Date.now() });
@@ -360,16 +376,16 @@ export class TipFlow {
       }
       // Post-broadcast balance refresh is best-effort: its failure must not
       // mask a successful send, so it reports through utxos-error only. The
-      // cached set is stale either way — it may contain inputs the tx just
-      // spent — so it is invalidated before refreshing, and a failed refresh
-      // leaves it empty (the next send then fails the "No UTXOs" gate rather
-      // than building on spent inputs).
-      if (this.wallet === wallet) await this.refreshUtxos();
+      // cache was already filtered for spent inputs; if the current wallet is
+      // still the SAME ADDRESS (object identity may differ after re-import),
+      // refresh it — filtered through spentOutpoints so indexer-delayed echoes
+      // of spent inputs cannot repopulate.
+      if (this.wallet?.address === wallet.address) await this.refreshUtxos();
     } catch (e) {
       outcome({ type: 'send-error', message: (e as Error).message });
     } finally {
       this.inFlight = false;
-      this.emit({ type: 'send-busy', busy: false });
+      this.notify({ type: 'send-busy', busy: false });
     }
   }
 }
