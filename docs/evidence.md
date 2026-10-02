@@ -8,7 +8,7 @@ All 28 official send-and-receive test vectors from `bitcoin/bips` (BIP-352)
 pass against the implementation in `src/sp/outputs.ts` + `src/sp/scan.ts`:
 
 ```
-npm test          # 88 tests, all green
+npm test          # 116 tests, all green
 ```
 
 `test/vectors.test.ts` consumes the vendored vector file

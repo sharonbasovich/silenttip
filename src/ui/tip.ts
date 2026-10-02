@@ -21,6 +21,23 @@ import {
 } from '../chain/esplora';
 import { addSentTip, loadState, saveState } from '../state';
 import { isBurnedSp } from '../sp/burned';
+import { TipFlowHost, type BindingView, type TipEvent } from './tipFlow';
+
+// Session-scoped: tab navigation remounts this panel, but in-flight sends and
+// resolutions must survive it — see TipFlowHost.
+const tipHost = new TipFlowHost({
+  resolveIdentifier,
+  fetchBinding,
+  isSignetSpAddress,
+  isBurnedSp,
+  getAddressUtxos,
+  getFeeEstimates,
+  broadcastTx,
+  buildSilentTipTx,
+  buildStaticTipTx,
+  onSentTip: addSentTip,
+  relays: DEFAULT_RELAYS,
+});
 
 export function renderTip(root: HTMLElement): void {
   const panel = el('section', { class: 'panel' });
@@ -40,65 +57,9 @@ export function renderTip(root: HTMLElement): void {
   const resolveBtn = el('button', { class: 'btn', type: 'button' }, 'Resolve');
   const resolveStatus = statusEl();
   const bindingBox = el('div');
-  let resolvedSp: string | null = null;
-
-  resolveBtn.addEventListener('click', async () => {
-    resolveStatus.el.textContent = '';
-    bindingBox.replaceChildren();
-    resolvedSp = null;
-    const input = idInput.value.trim();
-    try {
-      if (isSignetSpAddress(input)) {
-        resolvedSp = input;
-        bindingBox.append(
-          el('p', { class: 'muted small' },
-            'Direct tsp1 address — no Nostr binding checked. (Unverified: anyone can paste any address.)'),
-          copyable(input),
-        );
-        if (isBurnedSp(input)) {
-          bindingBox.append(el('div', { class: 'status err' },
-            'COMPROMISED demo identity — its private keys were made public; do not tip it.'));
-          resolvedSp = null;
-        }
-        return;
-      }
-      const pubkey = await resolveIdentifier(input);
-      resolveStatus.ok('Resolving binding from relays…');
-      const res = await fetchBinding(pubkey, DEFAULT_RELAYS);
-      if (!res) throw new Error('No silenttip binding event found for this pubkey');
-      if (!res.signatureValid) throw new Error('Binding event signature INVALID — not showing address');
-      if (res.binding.network !== 'signet') throw new Error(`Binding is for "${res.binding.network}", this demo is signet-only`);
-      resolvedSp = res.binding.sp;
-      bindingBox.append(
-        el('h3', {}, 'Verified binding'),
-        el('div', { class: 'small muted' }, `npub ${npubShort(pubkey)} · kind ${res.event.kind} · ${new Date(res.event.created_at * 1000).toLocaleString()}`),
-        copyable(res.binding.sp),
-        el('div', { class: 'status ok' }, `signature valid · event ${res.event.id.slice(0, 16)}…`),
-      );
-      if (isBurnedSp(res.binding.sp)) {
-        bindingBox.append(el('div', { class: 'status err' },
-          'COMPROMISED demo identity — its private keys were made public; do not tip it.'));
-        resolvedSp = null;
-        resolveStatus.err('Binding is valid but the recipient is a burned demo identity.');
-      } else {
-        resolveStatus.ok('Binding verified.');
-      }
-    } catch (e) {
-      resolveStatus.err((e as Error).message);
-    }
-  });
-
-  panel.append(el('label', {}, 'Recipient'), idInput, resolveBtn, resolveStatus.el, bindingBox);
 
   // --- sender wallet ---
   const walletPanel = el('section', { class: 'panel' });
-  root.append(walletPanel);
-  walletPanel.append(
-    el('h2', {}, 'Sender (test wallet)'),
-    el('p', { class: 'muted small' },
-      'A single-key P2WPKH signet wallet. Fund it from a signet faucet — links below.'),
-  );
-
   const wifInput = el('input', {
     type: 'password', placeholder: 'import WIF (testnet) or generate', autocomplete: 'off',
   });
@@ -106,40 +67,154 @@ export function renderTip(root: HTMLElement): void {
   const importBtn = el('button', { class: 'btn', type: 'button' }, 'Import WIF');
   const walletStatus = statusEl();
   const walletBox = el('div');
-  let wallet: SenderWallet | null = null;
-  let utxos: EsploraUtxo[] = [];
 
-  const refreshWallet = async () => {
+  // --- send ---
+  const sendPanel = el('section', { class: 'panel' });
+  const amountInput = el('input', { type: 'number', min: '546', value: '1000' });
+  const staticChk = el('input', { type: 'checkbox', id: 'static-tip' });
+  const sendBtn = el('button', { class: 'btn primary', type: 'button' }, 'Build & broadcast tip');
+  const sendStatus = statusEl();
+  const sendBox = el('div');
+
+  const flow = tipHost.mount(onFlowEvent);
+
+  function renderBindingView(b: BindingView): void {
+    bindingBox.replaceChildren();
+    if (b.kind === 'direct') {
+      bindingBox.append(
+        el('p', { class: 'muted small' },
+          'Direct tsp1 address — no Nostr binding checked. (Unverified: anyone can paste any address.)'),
+        copyable(b.sp),
+      );
+    } else {
+      bindingBox.append(
+        el('h3', {}, 'Verified binding'),
+        el('div', { class: 'small muted' },
+          `npub ${npubShort(b.pubkey)} · kind ${b.eventKind} · ${new Date(b.createdAt * 1000).toLocaleString()}`),
+        copyable(b.sp),
+        el('div', { class: 'status ok' }, `signature valid · event ${b.eventId.slice(0, 16)}…`),
+      );
+    }
+    if (b.burned) {
+      bindingBox.append(el('div', { class: 'status err' },
+        'COMPROMISED demo identity — its private keys were made public; do not tip it.'));
+      resolveStatus.err(b.kind === 'verified'
+        ? 'Binding is valid but the recipient is a burned demo identity.'
+        : 'Recipient is a burned demo identity.');
+    } else {
+      resolveStatus.ok(b.kind === 'verified' ? 'Binding verified.' : '');
+      if (b.kind === 'direct') resolveStatus.el.textContent = '';
+    }
+  }
+
+  function renderWalletBox(address: string | null, utxos: EsploraUtxo[] | null): void {
     walletBox.replaceChildren();
-    if (!wallet) return;
-    walletBox.append(el('label', {}, 'Sender address (fund me)'), copyable(wallet.address));
-    walletStatus.ok('Fetching UTXOs…');
-    try {
-      utxos = await getAddressUtxos(wallet.address);
+    if (!address) return;
+    walletBox.append(el('label', {}, 'Sender address (fund me)'), copyable(address));
+    if (utxos) {
       const total = utxos.reduce((s, u) => s + u.value, 0);
       walletBox.append(
-        el('p', { class: 'small' }, `Balance: ${total.toLocaleString()} sats across ${utxos.length} UTXO(s)`),
+        el('p', { class: 'small' },
+          `Balance: ${total.toLocaleString()} sats across ${utxos.length} UTXO(s)`),
         el('p', { class: 'small muted' },
           'Faucets: signetfaucet.com · bitcoinsignetfaucet.com · mempool.space signet faucet'),
       );
-      walletStatus.ok('');
-      walletStatus.el.textContent = '';
-    } catch (e) {
-      walletStatus.err((e as Error).message);
     }
-  };
+  }
+
+  function setSendBusy(busy: boolean): void {
+    for (const c of [idInput, resolveBtn, amountInput, staticChk, sendBtn, wifInput, genWBtn, importBtn]) {
+      c.disabled = busy;
+    }
+    // Only paint the busy label; the end-of-busy event must not clobber the
+    // sent-*/send-error status already rendered by the flow.
+    if (busy) sendStatus.ok('Working…');
+  }
+
+  function onFlowEvent(evt: TipEvent): void {
+    switch (evt.type) {
+      case 'resolve-cleared':
+        resolveStatus.el.textContent = '';
+        bindingBox.replaceChildren();
+        break;
+      case 'resolve-progress':
+        resolveStatus.ok(evt.message);
+        break;
+      case 'resolve-applied':
+        renderBindingView(evt.binding);
+        break;
+      case 'resolve-error':
+        resolveStatus.err(evt.message);
+        break;
+      case 'wallet-changed':
+        walletStatus.el.textContent = '';
+        renderWalletBox(evt.address, null);
+        break;
+      case 'utxos-pending':
+        walletStatus.ok('Fetching UTXOs…');
+        break;
+      case 'utxos-applied':
+        renderWalletBox(evt.address, evt.utxos);
+        walletStatus.el.textContent = '';
+        break;
+      case 'utxos-error':
+        walletStatus.err(evt.message);
+        break;
+      case 'send-busy':
+        setSendBusy(evt.busy);
+        break;
+      case 'send-error':
+        sendStatus.err(evt.message);
+        break;
+      case 'sent-static':
+        sendBox.append(el('p', {}, 'Static tip broadcast: ', txidLink(evt.txid)));
+        sendStatus.ok('Static tip sent — see it in "What the chain sees".');
+        if (evt.storageError) {
+          sendBox.append(el('p', { class: 'small muted' },
+            `Note: tip history could not be saved locally (${evt.storageError})`));
+        }
+        break;
+      case 'sent-silent':
+        sendBox.append(
+          el('p', {}, 'Silent tip broadcast: ', txidLink(evt.txid)),
+          el('p', { class: 'small muted' },
+            `fee ${evt.fee} sats · ${evt.inputCount} input(s) · SP output index ${evt.silentOutputIndexes.join(', ')}`),
+        );
+        sendStatus.ok('Broadcast accepted.');
+        if (evt.storageError) {
+          sendBox.append(el('p', { class: 'small muted' },
+            `Note: tip history could not be saved locally (${evt.storageError})`));
+        }
+        break;
+    }
+  }
+
+  // --- wire interactions ---
+  resolveBtn.addEventListener('click', () => void flow.resolve(idInput.value));
+  idInput.addEventListener('input', () => flow.recipientEdited(idInput.value));
+
+  panel.append(el('label', {}, 'Recipient'), idInput, resolveBtn, resolveStatus.el, bindingBox);
+
+  root.append(walletPanel);
+  walletPanel.append(
+    el('h2', {}, 'Sender (test wallet)'),
+    el('p', { class: 'muted small' },
+      'A single-key P2WPKH signet wallet. Fund it from a signet faucet — links below.'),
+  );
 
   genWBtn.addEventListener('click', () => {
-    wallet = generateSenderWallet();
+    const wallet = generateSenderWallet();
     saveState({ senderWif: wifFromPrivKey(wallet.privKey) });
     wifInput.value = wifFromPrivKey(wallet.privKey);
-    void refreshWallet();
+    flow.setWallet(wallet);
+    void flow.refreshUtxos();
   });
   importBtn.addEventListener('click', () => {
     try {
-      wallet = walletFromPrivKey(privKeyFromWif(wifInput.value));
+      const wallet = walletFromPrivKey(privKeyFromWif(wifInput.value));
       saveState({ senderWif: wifInput.value.trim() });
-      void refreshWallet();
+      flow.setWallet(wallet);
+      void flow.refreshUtxos();
     } catch (e) {
       walletStatus.err((e as Error).message);
     }
@@ -148,65 +223,22 @@ export function renderTip(root: HTMLElement): void {
   const savedWif = loadState().senderWif;
   if (savedWif) {
     try {
-      wallet = walletFromPrivKey(privKeyFromWif(savedWif));
+      const wallet = walletFromPrivKey(privKeyFromWif(savedWif));
       wifInput.value = savedWif;
-      void refreshWallet();
+      flow.setWallet(wallet);
+      void flow.refreshUtxos();
     } catch { /* ignore */ }
   }
 
   walletPanel.append(wifInput, el('div', { class: 'row' }, genWBtn, importBtn), walletStatus.el, walletBox);
 
-  // --- send ---
-  const sendPanel = el('section', { class: 'panel' });
   root.append(sendPanel);
   sendPanel.append(el('h2', {}, 'Broadcast'));
 
-  const amountInput = el('input', { type: 'number', min: '546', value: '1000' });
-  const staticChk = el('input', { type: 'checkbox', id: 'static-tip' });
-  const sendBtn = el('button', { class: 'btn primary', type: 'button' }, 'Build & broadcast tip');
-  const sendStatus = statusEl();
-  const sendBox = el('div');
-
-  sendBtn.addEventListener('click', async () => {
+  sendBtn.addEventListener('click', () => {
     sendStatus.el.textContent = '';
     sendBox.replaceChildren();
-    try {
-      const sats = parseInt(amountInput.value, 10);
-      if (!Number.isFinite(sats) || sats < 546) throw new Error('Amount must be ≥ 546 sats');
-      if (!wallet) throw new Error('Set up the sender wallet first');
-      if (!utxos.length) throw new Error('No UTXOs — fund the sender address first');
-
-      const fees = await getFeeEstimates();
-      const rate = Math.max(1, Math.ceil(fees['6'] ?? 1));
-
-      if (staticChk.checked) {
-        // honest comparison: a normal tip to the sender's own static address
-        const txHex = buildStaticTipTx(wallet, utxos, sats, rate);
-        const txid = await broadcastTx(txHex);
-        addSentTip({ txid, kind: 'static', amountSats: sats, to: wallet.address, at: Date.now() });
-        utxos = await getAddressUtxos(wallet.address);
-        sendBox.append(el('p', {}, 'Static tip broadcast: ', txidLink(txid)));
-        sendStatus.ok('Static tip sent — see it in "What the chain sees".');
-        return;
-      }
-
-      if (!resolvedSp) throw new Error('Resolve a recipient first');
-
-      const plan = buildSilentTipTx({
-        wallet, utxos, spAddress: resolvedSp, amountSats: sats, feeRateSatVb: rate,
-      });
-      const txid = await broadcastTx(plan.txHex);
-      addSentTip({ txid, kind: 'silent', amountSats: sats, to: resolvedSp, at: Date.now() });
-      utxos = await getAddressUtxos(wallet.address);
-      sendBox.append(
-        el('p', {}, 'Silent tip broadcast: ', txidLink(txid)),
-        el('p', { class: 'small muted' },
-          `fee ${plan.fee} sats · ${plan.inputs.length} input(s) · SP output index ${plan.silentOutputIndexes.join(', ')}`),
-      );
-      sendStatus.ok('Broadcast accepted.');
-    } catch (e) {
-      sendStatus.err((e as Error).message);
-    }
+    void flow.send({ sats: parseInt(amountInput.value, 10), staticTip: staticChk.checked });
   });
 
   sendPanel.append(
@@ -215,6 +247,19 @@ export function renderTip(root: HTMLElement): void {
       staticChk, ' send a static-address tip instead (builds the comparison cluster)'),
     sendBtn, sendStatus.el, sendBox,
   );
+
+  // Re-mount restore: the session-scoped flow may hold a resolution, wallet,
+  // in-flight send or last outcome from before this panel's DOM was replaced.
+  // Restoring the bound input text keeps the visible field consistent with
+  // the validated recipient it refers to.
+  const boundText = flow.boundInputText;
+  if (boundText) {
+    idInput.value = boundText;
+    if (flow.bindingView) renderBindingView(flow.bindingView);
+  }
+  renderWalletBox(flow.walletAddress, flow.utxoList.length ? [...flow.utxoList] : null);
+  if (flow.sending) setSendBusy(true);
+  if (flow.lastSendOutcome) onFlowEvent(flow.lastSendOutcome);
 }
 
 function npubShort(hex: string): string {
@@ -227,10 +272,11 @@ function buildStaticTipTx(
   utxos: EsploraUtxo[],
   amountSats: number,
   feeRateSatVb: number,
-): string {
+): { txHex: string; spent: EsploraUtxo[] } {
   const sorted = [...utxos].sort((a, b) => a.value - b.value);
   const psbt = new bitcoin.Psbt({ network: SIGNET });
   const p2wpkh = bitcoin.payments.p2wpkh({ pubkey: Buffer.from(wallet.pubKey), network: SIGNET });
+  const spent: EsploraUtxo[] = [];
   let total = 0;
   const estFee = () => Math.ceil((11 + psbt.txInputs.length * 68 + 31 * 2) * feeRateSatVb);
   for (const u of sorted) {
@@ -238,6 +284,7 @@ function buildStaticTipTx(
       hash: u.txid, index: u.vout,
       witnessUtxo: { script: p2wpkh.output!, value: BigInt(u.value) },
     });
+    spent.push(u);
     total += u.value;
     if (total >= amountSats + estFee() + 546) break;
   }
@@ -252,5 +299,5 @@ function buildStaticTipTx(
   };
   psbt.signAllInputs(signer);
   psbt.finalizeAllInputs();
-  return psbt.extractTransaction().toHex();
+  return { txHex: psbt.extractTransaction().toHex(), spent };
 }
