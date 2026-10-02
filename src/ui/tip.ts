@@ -272,10 +272,11 @@ function buildStaticTipTx(
   utxos: EsploraUtxo[],
   amountSats: number,
   feeRateSatVb: number,
-): string {
+): { txHex: string; spent: EsploraUtxo[] } {
   const sorted = [...utxos].sort((a, b) => a.value - b.value);
   const psbt = new bitcoin.Psbt({ network: SIGNET });
   const p2wpkh = bitcoin.payments.p2wpkh({ pubkey: Buffer.from(wallet.pubKey), network: SIGNET });
+  const spent: EsploraUtxo[] = [];
   let total = 0;
   const estFee = () => Math.ceil((11 + psbt.txInputs.length * 68 + 31 * 2) * feeRateSatVb);
   for (const u of sorted) {
@@ -283,6 +284,7 @@ function buildStaticTipTx(
       hash: u.txid, index: u.vout,
       witnessUtxo: { script: p2wpkh.output!, value: BigInt(u.value) },
     });
+    spent.push(u);
     total += u.value;
     if (total >= amountSats + estFee() + 546) break;
   }
@@ -297,5 +299,5 @@ function buildStaticTipTx(
   };
   psbt.signAllInputs(signer);
   psbt.finalizeAllInputs();
-  return psbt.extractTransaction().toHex();
+  return { txHex: psbt.extractTransaction().toHex(), spent };
 }

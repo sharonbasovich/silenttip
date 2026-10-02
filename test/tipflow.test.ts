@@ -16,6 +16,7 @@ const WALLET_A: SenderWallet = { privKey: new Uint8Array(32).fill(1), pubKey: ne
 const WALLET_B: SenderWallet = { privKey: new Uint8Array(32).fill(3), pubKey: new Uint8Array(33).fill(4), address: 'tb1q' + 'b'.repeat(38) };
 const UTXO_A: EsploraUtxo = { txid: 'a'.repeat(64), vout: 0, value: 50_000, status: { confirmed: true } };
 const UTXO_B: EsploraUtxo = { txid: 'b'.repeat(64), vout: 0, value: 60_000, status: { confirmed: true } };
+const UTXO_C: EsploraUtxo = { txid: 'c'.repeat(64), vout: 0, value: 7_000, status: { confirmed: true } };
 
 function deferred<T>() {
   let res!: (v: T) => void;
@@ -67,7 +68,7 @@ function harness(overrides: Partial<TipDeps> = {}): Harness {
     getFeeEstimates: vi.fn(async () => ({ '6': 2 })),
     broadcastTx: vi.fn(async () => 'txid-' + '9'.repeat(58)),
     buildSilentTipTx: vi.fn(({ spAddress }: { spAddress: string }) => plan(spAddress)),
-    buildStaticTipTx: vi.fn(() => 'static-hex'),
+    buildStaticTipTx: vi.fn(() => ({ txHex: 'static-hex', spent: [UTXO_A] })),
     onSentTip: (t: StoredTip) => sent.push(t),
     relays: ['wss://relay.example'],
     ...overrides,
@@ -398,6 +399,116 @@ describe('TipFlow remount (TipFlowHost)', () => {
     if (f2.lastSendOutcome) evB.push(f2.lastSendOutcome);
     expect(ofType(evB, 'sent-silent')).toHaveLength(1);
     expect(f2.walletAddress).toBe(WALLET_A.address);
+  });
+});
+
+describe('saved-WIF remount (same-address wallet object)', () => {
+  it('same-address restore is a no-op and preserves a pending refresh', async () => {
+    const slow = deferred<EsploraUtxo[]>();
+    const { flow, events } = harness({ getAddressUtxos: vi.fn(() => slow.p) });
+    flow.setWallet(WALLET_A);
+    void flow.refreshUtxos();
+    await flush();
+
+    // renderTip's saved-WIF block rebuilds a fresh wallet object on remount
+    flow.setWallet({ ...WALLET_A });
+    slow.res([UTXO_A]);
+    await flush();
+
+    expect(flow.utxoList).toEqual([UTXO_A]);   // pending refresh still applied
+    expect(ofType(events, 'wallet-changed')).toHaveLength(1); // no redundant emit
+  });
+
+  it.each(['before', 'after'] as const)(
+    'same-address restore during an in-flight send keeps invalidation (refresh resolves %s acceptance)',
+    async (when) => {
+      const bc = deferred<string>();
+      const ref = deferred<EsploraUtxo[]>();
+      let calls = 0;
+      const { flow, deps, events } = harness({
+        broadcastTx: vi.fn(() => bc.p),
+        // indexer delay: the spent input keeps coming back on later refreshes
+        getAddressUtxos: vi.fn(() => (++calls === 1 ? Promise.resolve([UTXO_A]) : ref.p)),
+      });
+      flow.setWallet(WALLET_A);
+      await flow.refreshUtxos();               // seeds [UTXO_A]
+      await flow.resolve('npubA');
+
+      const sendP = flow.send({ sats: 1000, staticTip: false }); // awaiting broadcast
+      await flush();
+
+      // remount: same-address WIF restore + its refresh call (as renderTip does)
+      flow.setWallet({ ...WALLET_A });
+      const remountRefresh = flow.refreshUtxos();
+      if (when === 'before') {
+        ref.res([UTXO_A]);                     // indexer echo before acceptance
+        await remountRefresh;
+      }
+
+      bc.res('txid-' + '9'.repeat(58));        // broadcast accepted
+      if (when === 'after') {
+        // the remount refresh AND the post-send refresh share this deferred —
+        // resolve it now (spent echo); the remount one is superseded and dropped
+        ref.res([UTXO_A]);
+      }
+      await Promise.all([sendP, remountRefresh]);
+      await flush();
+
+      expect(ofType(events, 'sent-silent')).toHaveLength(1);
+      expect(ofType(events, 'send-error')).toHaveLength(0);
+      // the spent outpoint is excluded no matter when the refresh landed
+      expect(flow.utxoList).toHaveLength(0);
+      await flow.send({ sats: 1000, staticTip: false });
+      expect(deps.broadcastTx).toHaveBeenCalledTimes(1);
+      expect(ofType(events, 'send-error').at(-1)?.message)
+        .toBe('No UTXOs — fund the sender address first');
+    },
+  );
+
+  it('post-broadcast indexer delay: spent inputs are excluded, genuinely new UTXOs preserved', async () => {
+    let calls = 0;
+    const { flow, deps, events } = harness({
+      getAddressUtxos: vi.fn(async () =>
+        (++calls === 1 ? [UTXO_A] : [UTXO_A, UTXO_C])), // lagging index echoes the spent input
+    });
+    flow.setWallet(WALLET_A);
+    await flow.refreshUtxos();
+    await flow.resolve('npubA');
+
+    await flow.send({ sats: 1000, staticTip: false });
+    expect(ofType(events, 'sent-silent')).toHaveLength(1);
+    expect(flow.utxoList).toEqual([UTXO_C]);   // spent A excluded, new C kept
+
+    // a follow-up send builds ONLY from genuinely unspent inputs
+    await flow.send({ sats: 600, staticTip: false });
+    expect(deps.buildSilentTipTx).toHaveBeenLastCalledWith(
+      expect.objectContaining({ utxos: [UTXO_C] }),
+    );
+    expect(deps.broadcastTx).toHaveBeenCalledTimes(2);
+  });
+
+  it('static-tip persistence failure keeps success and excludes spent inputs', async () => {
+    let calls = 0;
+    const { flow, deps, events } = harness({
+      onSentTip: () => { throw new Error('QuotaExceededError'); },
+      getAddressUtxos: vi.fn(async () =>
+        (++calls === 1 ? [UTXO_A] : [UTXO_A])), // lagging echo of the spent input
+    });
+    flow.setWallet(WALLET_A);
+    await flow.refreshUtxos();
+
+    await flow.send({ sats: 1000, staticTip: true });
+    const sent = ofType(events, 'sent-static');
+    expect(sent).toHaveLength(1);
+    expect(sent[0].storageError).toBe('QuotaExceededError');
+    expect(ofType(events, 'send-error')).toHaveLength(0);
+    expect(flow.utxoList).toHaveLength(0);     // spent echo filtered out
+
+    // no retry, no rebuild on spent inputs
+    await flow.send({ sats: 1000, staticTip: true });
+    expect(deps.broadcastTx).toHaveBeenCalledTimes(1);
+    expect(ofType(events, 'send-error').at(-1)?.message)
+      .toBe('No UTXOs — fund the sender address first');
   });
 });
 

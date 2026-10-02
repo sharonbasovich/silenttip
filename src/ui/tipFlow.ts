@@ -36,7 +36,7 @@ export interface TipDeps {
     utxos: EsploraUtxo[],
     amountSats: number,
     feeRateSatVb: number,
-  ): string;
+  ): { txHex: string; spent: EsploraUtxo[] };
   onSentTip(tip: StoredTip): void;
   relays: string[];
 }
@@ -94,6 +94,9 @@ export class TipFlow {
   private inFlight = false;
   private lastApplied: BindingView | null = null;
   private lastOutcome: TipEvent | null = null;
+  /** Outpoints spent by accepted broadcasts this session — never un-spent,
+   *  so refresh results filtered through them can't repopulate spent inputs. */
+  private readonly spentOutpoints = new Set<string>();
 
   constructor(
     private readonly deps: TipDeps,
@@ -235,8 +238,14 @@ export class TipFlow {
     }
   }
 
-  /** Replace the sender wallet; drops old UTXOs and cancels in-flight fetches. */
+  /**
+   * Replace the sender wallet; drops old UTXOs and cancels in-flight fetches.
+   * Wallet identity is the ADDRESS: a same-address object (e.g. a WIF
+   * re-import on tab remount) is a no-op, preserving pending refreshes and
+   * the identity that in-flight sends compare against.
+   */
   setWallet(wallet: SenderWallet | null): void {
+    if (this.wallet?.address === wallet?.address) return;
     this.wallet = wallet;
     this.walletGen++;
     this.refreshSeq++;
@@ -252,8 +261,11 @@ export class TipFlow {
     const seq = ++this.refreshSeq;
     this.emit({ type: 'utxos-pending', address: wallet.address });
     try {
-      const utxos = await this.deps.getAddressUtxos(wallet.address);
+      const fetched = await this.deps.getAddressUtxos(wallet.address);
       if (gen !== this.walletGen || seq !== this.refreshSeq) return;
+      // Indexer lag can echo back inputs a broadcast just spent — they are
+      // outpoints, they can never un-spend, so filter them for the session.
+      const utxos = fetched.filter((u) => !this.spentOutpoints.has(`${u.txid}:${u.vout}`));
       this.utxos = utxos;
       this.emit({ type: 'utxos-applied', address: wallet.address, utxos });
     } catch (e) {
@@ -295,8 +307,11 @@ export class TipFlow {
       let kind: StoredTip['kind'];
       let to: string;
       let plan: SendPlan | null = null;
+      let spentInputs: EsploraUtxo[];
       if (staticTip) {
-        txHex = this.deps.buildStaticTipTx(wallet, utxos, sats, rate);
+        const built = this.deps.buildStaticTipTx(wallet, utxos, sats, rate);
+        txHex = built.txHex;
+        spentInputs = built.spent;
         kind = 'static';
         to = wallet.address;
       } else {
@@ -309,13 +324,17 @@ export class TipFlow {
           feeRateSatVb: rate,
         });
         txHex = plan.txHex;
+        spentInputs = plan.inputs;
         kind = 'silent';
         to = spAddress;
       }
       const txid = await this.deps.broadcastTx(txHex);
-      // Invalidate possibly-spent inputs FIRST — persistence is best-effort
-      // and may throw (e.g. localStorage QuotaExceededError), which must not
-      // leave a stale spendable set behind.
+      // Mark the consumed outpoints spent for the rest of the session — a
+      // lagging indexer's refresh can then never repopulate them. Also drop
+      // the cached set immediately, BEFORE persistence, which is best-effort
+      // and may throw (e.g. localStorage QuotaExceededError) — a failure must
+      // not leave a stale spendable set behind.
+      for (const u of spentInputs) this.spentOutpoints.add(`${u.txid}:${u.vout}`);
       if (this.wallet === wallet) this.utxos = [];
       let storageError: string | undefined;
       try {
