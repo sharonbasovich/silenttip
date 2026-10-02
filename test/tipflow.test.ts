@@ -179,6 +179,30 @@ describe('TipFlow recipient resolution', () => {
     expect(ofType(events, 'resolve-error')).toHaveLength(0);
   });
 
+  it('same-input supersession: a stale same-input failure cannot clear the newer pending marker', async () => {
+    const a1 = deferred<ResolvedBinding | null>();
+    const a2 = deferred<ResolvedBinding | null>();
+    let calls = 0;
+    const { flow, events } = harness({
+      fetchBinding: vi.fn(() => (++calls === 1 ? a1.p : a2.p)),
+    });
+    const p1 = flow.resolve('npubA');
+    await flush();                      // A1 suspended awaiting fetchBinding
+    const p2 = flow.resolve('npubA');   // same raw input — A2 supersedes A1
+    await flush();                      // A2 suspended awaiting its own fetchBinding
+    a1.rej(new Error('old request failed'));
+    await p1;                           // stale reject must NOT clear A2's pending marker
+    expect(ofType(events, 'resolve-error')).toHaveLength(0);
+
+    flow.recipientEdited('npubB');      // pending still owned by A2 → edit invalidates it
+    expect(ofType(events, 'resolve-cleared').at(-1)?.reason).toBe('edited');
+    a2.res(bindingFor(SP_A, 'pk-npubA'));
+    await p2;
+    await flush();
+    expect(flow.resolvedSp).toBeNull();
+    expect(ofType(events, 'resolve-applied')).toHaveLength(0);
+  });
+
   it('a burned verified binding applies but yields no usable recipient', async () => {
     const { flow, events } = harness({
       fetchBinding: vi.fn(async () => bindingFor(BURNED_TSP1[0], 'pk-x')),
@@ -236,7 +260,7 @@ describe('TipFlow send', () => {
 
   it('keeps broadcast success visible when the follow-up refresh fails', async () => {
     let calls = 0;
-    const { flow, events, sent } = harness({
+    const { flow, deps, events, sent } = harness({
       getAddressUtxos: vi.fn(async () => (++calls === 1 ? [UTXO_A] : Promise.reject(new Error('esplora down')))),
     });
     flow.setWallet(WALLET_A);
@@ -248,6 +272,12 @@ describe('TipFlow send', () => {
     expect(ofType(events, 'send-error')).toHaveLength(0);
     expect(ofType(events, 'utxos-error').at(-1)?.message).toBe('esplora down');
     expect(sent).toHaveLength(1);
+
+    // the spent cached set is invalidated — a follow-up send cannot reuse it
+    expect(flow.utxoList).toHaveLength(0);
+    await flow.send({ sats: 1000, staticTip: false });
+    expect(deps.broadcastTx).toHaveBeenCalledTimes(1);
+    expect(ofType(events, 'send-error').at(-1)?.message).toBe('No UTXOs — fund the sender address first');
   });
 
   it('recovers after a broadcast failure — the next send works', async () => {

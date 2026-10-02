@@ -87,7 +87,7 @@ export class TipFlow {
   private refreshSeq = 0;
   private walletGen = 0;
   private resolution: Resolution | null = null;
-  private pendingResolveInput: string | null = null;
+  private pendingResolve: { seq: number; input: string } | null = null;
   private wallet: SenderWallet | null = null;
   private utxos: EsploraUtxo[] = [];
   private inFlight = false;
@@ -125,9 +125,9 @@ export class TipFlow {
    */
   recipientEdited(raw: string): void {
     const input = raw.trim();
-    if (this.pendingResolveInput !== null && input !== this.pendingResolveInput) {
+    if (this.pendingResolve !== null && input !== this.pendingResolve.input) {
       this.resolveSeq++;
-      this.pendingResolveInput = null;
+      this.pendingResolve = null;
       this.emit({ type: 'resolve-cleared', reason: 'edited' });
       return;
     }
@@ -142,12 +142,15 @@ export class TipFlow {
   async resolve(rawInput: string): Promise<void> {
     const input = rawInput.trim();
     const seq = ++this.resolveSeq;
-    this.pendingResolveInput = input;
+    this.pendingResolve = { seq, input };
     this.resolution = null;
     this.emit({ type: 'resolve-cleared', reason: 'new-resolve' });
     const stale = () => seq !== this.resolveSeq;
+    // Only the request that owns the pending slot may clear it — a stale
+    // request finishing (success or error) must never drop a newer one's
+    // pending marker, or an input edit could fail to invalidate it.
     const done = () => {
-      if (this.pendingResolveInput === input) this.pendingResolveInput = null;
+      if (this.pendingResolve?.seq === seq) this.pendingResolve = null;
     };
     try {
       if (!input) throw new Error('Enter an npub, NIP-05, or tsp1 address');
@@ -191,8 +194,8 @@ export class TipFlow {
         resolvedSp: this.resolvedSp,
       });
     } catch (e) {
-      done();
       if (stale()) return;
+      done();
       this.emit({ type: 'resolve-error', input, message: (e as Error).message });
     }
   }
@@ -285,8 +288,15 @@ export class TipFlow {
         this.emit({ type: 'sent-static', txid, to, amountSats: sats });
       }
       // Post-broadcast balance refresh is best-effort: its failure must not
-      // mask a successful send, so it reports through utxos-error only.
-      if (this.wallet === wallet) await this.refreshUtxos();
+      // mask a successful send, so it reports through utxos-error only. The
+      // cached set is stale either way — it may contain inputs the tx just
+      // spent — so it is invalidated before refreshing, and a failed refresh
+      // leaves it empty (the next send then fails the "No UTXOs" gate rather
+      // than building on spent inputs).
+      if (this.wallet === wallet) {
+        this.utxos = [];
+        await this.refreshUtxos();
+      }
     } catch (e) {
       this.emit({ type: 'send-error', message: (e as Error).message });
     } finally {
