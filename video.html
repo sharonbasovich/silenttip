@@ -6,7 +6,7 @@
     <title>SilentTip — demo video</title>
     <meta
       name="description"
-      content="Judge-readable walkthrough: publish a Nostr-bound silent-payment identity, resolve it, and see what the chain sees. Signet only."
+      content="Nostr-bound silent-payment identity: an unfunded signet UI walkthrough and a separate local-regtest transaction proof. No mainnet funds."
     />
     <style>
       :root {
@@ -49,12 +49,13 @@
   <body>
     <div class="wrap">
       <header>
-        <span class="badge">signet only · no real funds</span>
+        <span class="badge">signet UI + local regtest · no mainnet funds</span>
         <h1><span class="accent">Silent</span>Tip — demo video</h1>
         <p class="sub">
-          A Nostr creator publishes one reusable silent-payment identity; every tip to it lands at a
-          fresh on-chain output observers cannot link back to it. Everything below runs on Bitcoin
-          signet — test coins only.
+          One reusable Nostr identity can receive fresh silent-payment outputs without publishing
+          that reusable address in each output. The first video shows an unfunded Bitcoin signet
+          walkthrough. The second shows a completed transaction on a separate local regtest chain.
+          No funded public signet tip has been verified, and no mainnet funds are used.
         </p>
         <p class="sub" style="font-size:0.82rem">
           This walkthrough was re-captured after earlier demo identities were retired: only the
@@ -72,18 +73,18 @@
         <ol class="beats">
           <li><b>Receive</b> — restore the demo silent-payment identity (scan + spend keys, browser-side; the seed never appears). Its <code>tsp1</code> address was published as a signed Nostr event (<code>kind 30078</code>, <code>d=silenttip</code>) that public relays accepted.</li>
           <li><b>Tip</b> — paste the creator's <code>npub</code>; the app resolves the binding live, verifies the schnorr signature, and shows the bound <code>tsp1</code> (event <code>5a9f1252…</code>). A throwaway sender wallet is generated and the broadcast button honestly reports <i>no UTXOs</i> — the demo wallet is unfunded, so nothing is claimed on-chain.</li>
-          <li><b>What the chain sees</b> — inspect any real signet transaction's outputs: a silent tip is just another x-only taproot key — nothing links it to the reusable address. (The tx shown is an unrelated signet tx, presented as what a tip looks like, not claimed to be one.)</li>
+          <li><b>What the chain sees</b> — inspect a real signet transaction's output scripts. The shown transaction is unrelated to SilentTip and is not evidence of a SilentTip payment. A silent-payment output does not publish the recipient's reusable address; this does not hide the sender or all payment relationships.</li>
           <li><b>Scan</b> — the receiver's scan key walks signet blocks via Esplora and recomputes candidate outputs; only their keys reveal which outputs are theirs.</li>
         </ol>
       </div>
 
       <div class="card">
-        <h2>Why this is private</h2>
+        <h2>What privacy this demonstrates</h2>
         <p style="margin:0; font-size:0.92rem; color: var(--muted)">
-          Address reuse is how chain analysis clusters a creator's income. Silent payments fix it at the
-          protocol level: the sender does the ECDH work off-chain, so each tip creates a brand-new taproot
-          output. The chain never sees the creator's published address, so tips cannot be clustered to it by
-          address reuse.
+          Silent payments address one source of linkage: reusing a public receiving address. The
+          sender derives a fresh Taproot output off-chain, without including the recipient's reusable
+          silent-payment address in that output. This is a specific recipient-address privacy property,
+          not a guarantee that every payment relationship is hidden.
           (Honest limits: sender inputs, change, amounts and timing stay visible, and spending several
           tips together can link those outputs to each other.)
         </p>
@@ -94,8 +95,8 @@
         regtest-only receiver — built by the repo's own transaction builder, broadcast, mined,
         and found by the repo's own receiver scan — runs end to end on a disposable regtest chain
         below (the transaction builder and scanner are the same code the app uses; UTXO discovery,
-        broadcast transport and block fetching differ). On public signet, broadcasting is still
-        blocked only by captcha/login-gated faucets — see
+        broadcast transport and block fetching differ). No funded public signet tip has been verified. The regtest run does not validate
+        public signet funding, transport or block retrieval — see
         <a href="https://github.com/sharonbasovich/silenttip/blob/main/docs/evidence.md">docs/evidence.md</a>
         for the exact, verifiable record of what has and has not been broadcast.
         The fixture's regtest-only receiver keys are public — it is never bound to
