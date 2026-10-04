@@ -57,9 +57,10 @@ readiness after funding. See `docs/evidence.md` §4–4b.
 
 - [`video.html`](video.html) + [`public/demo.mp4`](public/demo.mp4) —
   judge-readable video page (deployed at `/silenttip/video.html`) embedding the
-  captioned walkthrough: identity restore → npub resolution →
-  honest unfunded-broadcast gate → on-chain inspection → block scan. Only the
-  promoted demo identity appears; the receiver seed is never shown.
+  narrated walkthrough: creator tip-jar problem → genuine public binding
+  resolution → complete earlier local-regtest proof → precise privacy limits.
+  The new UI capture uses an isolated empty context and only the published
+  demo identity; no private keys are created or entered.
 - [`public/regtest-proof.mp4`](public/regtest-proof.mp4) +
   [`scripts/regtest-proof.json`](scripts/regtest-proof.json) — screencast
   and fixture (incl. raw tx hex) of the full send → broadcast → receiver-scan
