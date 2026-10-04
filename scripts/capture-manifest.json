@@ -1,0 +1,38 @@
+{
+  "sourceCommit": "fccbd87ffde40e4c9c58a390c568a71e00ab4cfc",
+  "demo": "https://sharonbasovich.github.io/silenttip/",
+  "assetPath": "assets/main-C8y9Hhq2.js",
+  "assetSha256": "0d6bcda23314c8e510d49878179dcdbeca8a11e90f06a834be2c2104753f1db2",
+  "regtestProofSha256": "99a218ee837354068cc5c8989b60e97fd93c916f9c70132e2bbd0f3d335f6405",
+  "npub": "npub1ds2lqjnc0u4zghaplaa306t0nz36l3fmzngnvztq5m5d4y9ruxtqy5ejdp",
+  "eventId": "5a9f1252c63454c7a1b4c604562a725060b0bb0434436d4e16bff9f67c2064f6",
+  "fixtureSource": "https://github.com/sharonbasovich/silenttip/blob/fccbd87ffde40e4c9c58a390c568a71e00ab4cfc/docs/evidence.md#2-nostr-binding--a-real-verifiable-event-on-public-relays",
+  "relays": [
+    "wss://relay.damus.io",
+    "wss://nos.lol",
+    "wss://relay.primal.net"
+  ],
+  "sourceHashes": {
+    "index.html": "bffa1c61b4d10d6f78f66544e5545eb359729554021a9491d863f24f616f99d1",
+    "package-lock.json": "587794fcbb98fb787f59f7a5f6a860ee7fb14882522d7f934c749602805a4f8a",
+    "src/chain/esplora.ts": "8cdcc7482ffc4ffbb94382fd290ef91987d87bd5f65aabe9b7052fefd0510293",
+    "src/main.ts": "a886a4330d23e5ad67885adcff6f936d162780292eb3863644c20fd4b95eca72",
+    "src/nostr/binding.ts": "0c0ba3185114204db6ac81189a5ec13a9379d8ae2da9b431e0714be464ea3437",
+    "src/sp/burned.ts": "1381a5ed145a39a9832e293c66ae36b8dd2c9119807e15db574c52add1b16138",
+    "src/sp/keys.ts": "5eacf104506b8cdcdecd327f4b71672d1f9654cab459f5710b161243abd913bd",
+    "src/sp/network.ts": "c972026784b9065122d73fc468ac787c2efa354158c4143bafa8e46f5ddace90",
+    "src/sp/outputs.ts": "070168e6948f8443cf18de8ea1a579b72003bf05e1eb775a902b2956a70d2779",
+    "src/sp/scan.ts": "8a0a8eda9b0219d3b412226ec66b2334d71842338c004aed577ac196fc786380",
+    "src/sp/send.ts": "002d6b48a139d602928242f7e900981ebeb11131a39712f4cf5affdc55498d1d",
+    "src/state.ts": "7312077a4ad86938856eaf418df70fe9f4cf823ddb3a43f21a1e5ef083435b3f",
+    "src/ui/chainview.ts": "32d0075dd1b2142336af0ddbb842e407debe5d581b175ed4722e35f4a6785923",
+    "src/ui/dom.ts": "0e5b0ec73b5877d9c1f5cbf1365a3e6ae379775585a3f8af66ab432cd9c1ad29",
+    "src/ui/receive.ts": "695a3385e3def334e7e9aa866c024edf69a4a14afbc63c1b5e3446764842fcd4",
+    "src/ui/scan.ts": "e76027aa70d31f5a88195a879b0a2d839a68d973edfcd5b10071aaa39449ba20",
+    "src/ui/tip.ts": "545851cd925352dd23428e6adc6087129172c8426043966960b95e38e14b84a7",
+    "src/ui/tipFlow.ts": "6889c14affca4e6e2d521f9795139888d0bc7006785f3f59ba27b5e210b6ce79",
+    "src/style.css": "373e37260b85f545a899dc341148a57ddf2eee243fa2866ad155d451119d9eba"
+  },
+  "cssPath": "assets/main-C9e2pbR7.css",
+  "cssSha256": "eb5ef1ccb7931c4543638a699921c1eb4f49132119d473674606598e9709ebd7"
+}
