@@ -24,7 +24,7 @@ app.append(
     el('span', { class: 'badge' }, 'signet only · no real funds'),
     el('h1', {}, el('span', { class: 'accent' }, 'Silent'), 'Tip'),
     el('p', { class: 'tagline' },
-      'Put one reusable address in your Nostr profile — every tip lands at a fresh taproot key observers cannot link back to it. BIP-352 silent payments, verified in your browser.'),
+      'One reusable Nostr tipping identity. BIP-352 derives fresh Taproot outputs without publishing the recipient’s reusable address in each payment. Signet UI demo; completed transaction proof on local regtest.'),
     el('p', { class: 'tagline muted' },
       'Sender inputs, change, amounts and timing stay visible; co-spending tips can link them.'),
     el('p', { class: 'tagline links' },
