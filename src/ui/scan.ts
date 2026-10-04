@@ -19,7 +19,7 @@ export function renderScan(root: HTMLElement): void {
   panel.append(
     el('h2', {}, 'Scan for incoming tips'),
     el('p', { class: 'muted' },
-      'Downloads recent signet blocks via Esplora, computes the BIP-352 input tweak for every transaction, and checks its taproot outputs against your scan key. Only your browser does the work — no server learns your address.'),
+      'Downloads recent signet blocks via Esplora, computes the BIP-352 input tweak for every transaction, and checks its taproot outputs against your scan key. The scan key stays in your browser; the public API still sees network requests.'),
   );
 
   const st = loadState();

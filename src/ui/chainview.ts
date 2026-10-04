@@ -13,7 +13,7 @@ export function renderChainView(root: HTMLElement): void {
   panel.append(
     el('h2', {}, 'What the chain sees'),
     el('p', { class: 'muted' },
-      'Outputs of the tips sent from this browser, straight from mempool.space signet. Reused addresses = clusterable. Every silent tip = a fresh, unlinked taproot output.'),
+      'Inspect output scripts from mempool.space signet. Silent-payment outputs avoid direct recipient-address reuse; other linkages may remain. An arbitrary inspected transaction is not evidence of a SilentTip payment.'),
   );
 
   const input = el('input', {
@@ -70,6 +70,6 @@ export function renderChainView(root: HTMLElement): void {
   const silentTips = tips.filter((t) => t.kind === 'silent');
   if (staticTips.length) box.append(el('h3', {}, 'Static-address tips (clusterable)'));
   for (const t of staticTips) void renderTx(t.txid, 'static').catch(() => undefined);
-  if (silentTips.length) box.append(el('h3', {}, 'Silent tips (unlinked)'));
+  if (silentTips.length) box.append(el('h3', {}, 'Silent tips (fresh recipient outputs)'));
   for (const t of silentTips) void renderTx(t.txid, 'silent').catch(() => undefined);
 }

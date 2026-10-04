@@ -46,7 +46,7 @@ export function renderTip(root: HTMLElement): void {
   panel.append(
     el('h2', {}, 'Send a tip'),
     el('p', { class: 'muted' },
-      'Resolve a Nostr identity to its bound tsp1 address, verify the signature, then build a signet transaction whose taproot output is unique to this payment — nothing on-chain links sender to receiver.'),
+      'Resolve a Nostr identity to its bound tsp1 address and verify the signature. The sender derives a fresh Taproot output without including the recipient’s reusable address. Sender inputs, change, amounts and timing remain visible.'),
   );
 
   // --- resolve recipient ---
