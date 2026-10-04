@@ -6,8 +6,8 @@ easy path."* This note audits SilentTip's hook against that bar, honestly.
 
 ## The hook in one line
 
-> Put one static address in your Nostr profile and get paid on-chain forever —
-> every tip lands at a fresh taproot key observers cannot link back to it.
+> One reusable Nostr tipping identity; fresh Bitcoin outputs without
+> publishing the recipient's reusable address in each payment.
 
 A judge should be able to repeat the pitch after 10 seconds. The tagline avoids
 jargon ("silent payments", "ECDH") up front; the mechanism is one click deeper.
@@ -21,14 +21,14 @@ tip), BIP-47 paycodes + notification transactions (two-way setup, chain
 footprint), Lightning zaps (channel liquidity, custodial defaults, still leaks
 the invoice receiver).
 
-SilentTip's claim is that the private option is *strictly easier* than every
-interactive alternative and equal-effort to the address-reuse default:
+SilentTip removes per-tip recipient coordination after a signed binding is
+published. Setup, sender funding and receiver scanning still add effort:
 
 | Effort | Static reused address | SilentTip |
 | --- | --- | --- |
 | Receiver setup | paste 1 address in bio | publish 1 signed event once |
 | Per tip | paste same address | paste npub — everything else derived |
-| Chain privacy | full income clustering | every tip unlinked, P2TR-native |
+| Chain privacy | direct address-reuse linkage | fresh P2TR outputs avoid direct recipient-address reuse linkage |
 | Receiver UX | watch address | scan blocks (or future tweak service) |
 
 The demo is built to *show* the distinction rather than assert it: the "What
@@ -61,23 +61,24 @@ Signet tip pair has been broadcast yet.
   (Nostr publish/resolve live on public relays, full spec compliance,
   real signet inspection, and a real send → broadcast → receiver-scan run
   on a local regtest chain) and what is not yet (a broadcast funded tip
-  *on public signet* — blocked only by faucet captcha gating, pending one
-  human faucet run).
+  *on public signet*). Funding attempts have not produced a verified funded
+  tip; regtest does not validate public signet transport or block retrieval.
 
 ## Known weaknesses (no hiding)
 
 - A broadcast silent tip is verified on local **regtest** (disposable coins,
-  same tx builder and scanner — `scripts/regtest-proof.json`, screencast) but not yet on **signet**: the throwaway wallet needs ~10k
-  faucet sats that require a human behind a captcha. We state this rather
-  than simulate it.
+  same tx builder and scanner — `scripts/regtest-proof.json`, screencast).
+  No funded public **signet** tip has been verified. Funding, public
+  broadcast transport and block retrieval remain unverified end to end.
 - The regtest fixture reveals the private keys of its dedicated
   regtest-only receiver (never bound to Nostr, never used on signet).
   Separately, two early demo identities are permanently burned — the Tip
   tab and `signet-e2e.mjs tip` refuse them (`src/sp/burned.ts`,
   `docs/evidence.md` §5b).
 - Full-chain scanning is expensive; the demo caps at 40 blocks and says so.
-- Sender privacy is out of scope — the sender's P2WPKH input reveals *who*
-  tipped, just not *whom*. That asymmetry is itself part of the demo's story.
+- The privacy claim is limited to recipient-address reuse protection.
+  Sender inputs, change, amounts and timing remain visible; co-spending
+  tips can link outputs. Payment relationships may still be inferred.
 
 ## If a judge has 30 seconds
 

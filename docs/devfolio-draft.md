@@ -7,8 +7,8 @@ the draft.
 
 ## Tagline
 
-One static address in your Nostr bio. Tips arrive on-chain at fresh taproot
-outputs observers cannot link back to it.
+One reusable Nostr tipping identity. Fresh Bitcoin outputs without
+publishing the recipient's reusable address in each payment.
 
 ## The problem it solves
 
@@ -20,12 +20,13 @@ the spontaneous tip jar entirely.
 
 SilentTip lets a Nostr creator publish a single **silent payments** tipping
 identity (BIP-352). A sender resolves that identity and constructs a payment
-whose on-chain output is a fresh taproot key that only the receiver can
-recognize — for every tip, forever, with zero interaction. To a chain
-analyst, each tip is an unremarkable one-off output; nothing on-chain links
-it to the published tsp1 address or to other tips to it. (The sender's own
-inputs, change, amounts and timing remain visible — sender privacy is out
-of scope.)
+whose on-chain output is a fresh taproot key, without including the
+recipient's reusable address in that output. The receiver scans with their
+keys to recognize incoming payments. This addresses recipient-address reuse,
+not a guarantee that all payment relationships are hidden: sender inputs,
+change, amounts and timing remain
+visible, and co-spending tips can link outputs. The hosted signet walkthrough
+is unfunded; a separate completed transaction proof runs on local regtest.
 
 ## What it does
 
@@ -37,10 +38,13 @@ of scope.)
   silent output. Optionally send a *static-address* tip back to your own
   wallet — the reused address is what a chain analyst clusters on.
 - **Scan:** the receiver's browser downloads recent signet blocks and runs
-  the BIP-352 ECDH scan locally — no server ever learns the address.
+  the BIP-352 ECDH scan locally. The scan key stays in the browser;
+  the public API still sees network requests.
 - **What the chain sees:** renders the outputs of each tip transaction
   straight from mempool.space's signet API — reused static outputs cluster
-  visibly, every silent tip is a fresh unlinked taproot key.
+  visibly; silent-payment outputs avoid direct recipient-address reuse.
+  The recorded signet inspection uses an unrelated transaction, not a
+  SilentTip payment.
 
 ## How it's built
 
@@ -76,8 +80,9 @@ of scope.)
   transaction derivation, signing and receiver-scan logic on a local
   regtest chain (`scripts/regtest-proof.json` + screencast, honestly
   labeled — a re-run needs Docker plus the gitignored sender state) and
-  left the public signet broadcast gated on a human faucet run —
-  `docs/evidence.md` states this explicitly rather than papering over it.
+  have not verified a funded public signet tip. Regtest uses different UTXO
+  discovery, broadcast transport and block retrieval, so funding alone does
+  not establish public signet readiness. See `docs/evidence.md`.
 - **The replay fixture is intentionally public.** Its disposable receiver
   private keys are committed so judges can reproduce the regtest scan; that
   receiver is a dedicated regtest-only `tsp1` never bound to Nostr or used

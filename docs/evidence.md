@@ -1,6 +1,8 @@
 # Evidence — what is verified and how
 
-Everything below was executed and observed. Nothing is simulated, mocked, or claimed beyond what ran.
+This record distinguishes live observations, a completed local-regtest run,
+and automated tests. The 116-test suite includes mocked regression tests;
+those tests are not evidence of a funded public signet payment.
 
 ## 1. BIP-352 correctness — official test vectors
 
@@ -30,7 +32,7 @@ cd silenttip && npm ci --legacy-peer-deps
 npm test
 ```
 
-## 1b. Hosted demo — verified end to end
+## 1b. Hosted UI walkthrough — no funded public signet tip
 
 The app is deployed on GitHub Pages and was exercised live:
 
@@ -203,10 +205,12 @@ video frames cannot be covered by `test/meta.test.ts`.
 ## 5. What is deliberately not claimed
 
 - No mainnet keys, transactions, or funds anywhere.
-- No claim that a silent tip has been broadcast until a signet txid exists.
+- The completed broadcast proof is local regtest only; no funded public
+  signet tip has been verified.
 - No claim that the public regtest fixture's receiver key remains private or
   safe to receive future Signet tips.
 - The Nostr binding proves *intent to receive*, not custody — the tsp1 keys
   are BIP-352-derived and independent of the nsec that signs the event.
-- Silent payments do not hide the sender's inputs; they unlink the
-  *recipient* from the payment output.
+- Silent-payment outputs do not include the recipient's reusable address.
+  Sender inputs, change, amounts and timing remain visible; co-spending
+  tips can link outputs. This does not guarantee that all payment relationships are hidden.
