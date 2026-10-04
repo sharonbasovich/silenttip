@@ -12,14 +12,18 @@ SilentTip is a signet-only demo that wires two protocols together:
    payment** transaction on Bitcoin **signet**.
 3. The receiver **scans signet blocks** with their scan key and cryptographically
    verifies which outputs are theirs — the on-chain output is a fresh P2TR key
-   that no observer can link to the published address.
+   that does not publish the recipient's reusable address in the output.
+   This reduces recipient-address reuse linkage; it does not hide the sender
+   or guarantee that payment relationships cannot be inferred.
 
-A built-in "what the chain sees" panel compares a silent tip against a plain
-address-reuse tip sent from the same demo wallet, making the privacy difference
-visible to judges in one click.
+A built-in "what the chain sees" panel can inspect signet output scripts.
+The recorded UI walkthrough inspects an unrelated signet transaction; it is
+not evidence of a SilentTip payment or a completed side-by-side comparison.
+The separate local-regtest recording demonstrates a completed silent payment.
 
-> **Signet only.** SilentTip never touches mainnet keys, real funds, or paid
-> services. All keys are throwaway test keys generated in your browser.
+> **Signet UI plus separate local-regtest proof.** The hosted UI targets
+> signet; the completed transaction proof uses a disposable local regtest
+> chain. No mainnet keys or funds are used. Never import real keys.
 
 **Live demo:** https://sharonbasovich.github.io/silenttip/ ·
 **Demo video:** https://sharonbasovich.github.io/silenttip/video.html
@@ -41,12 +45,13 @@ The four tabs walk the demo end to end:
 | **Receive** | Generate/restore a scan+spend key pair (BIP-352 derivation paths `m/352'/1'/0'/0/0` and `…/1`), get a `tsp1…` address, and optionally publish the signed binding to public Nostr relays. |
 | **Tip** | Resolve a creator's `npub`/NIP-05/`tsp1`, verify the binding, pick a fee rate, and broadcast a real signet transaction — or a "static tip" for comparison. |
 | **Scan** | Fetch the last *n* signet blocks from the mempool.space Esplora API and run the full BIP-352 scanning algorithm against every transaction. |
-| **Chain view** | Render what a chain analyst would see: silent-tip outputs are fresh unlinked P2TR keys; a static tip visibly clusters with the sender. |
+| **Chain view** | Render what a chain analyst would see: silent-tip outputs use fresh P2TR keys rather than the recipient's reusable address; static-address reuse creates a direct linkage. |
 
-To run the flow for real: generate a sender wallet in the Tip tab, fund it from
-a public signet faucet, then send a tip and scan. (Public faucets are
-captcha/login-gated; the broadcast pipeline is proven end-to-end on local
-regtest — see `docs/evidence.md` §4b.)
+No funded public signet tip has been verified. The recorded UI walkthrough is
+unfunded; the completed transaction proof is on local regtest. That proof
+uses the same transaction builder and scanner, but different UTXO discovery,
+broadcast transport and block retrieval. It does not establish public signet
+readiness after funding. See `docs/evidence.md` §4–4b.
 
 ## Demo assets
 
@@ -60,7 +65,7 @@ regtest — see `docs/evidence.md` §4b.)
   and fixture (incl. raw tx hex) of the full send → broadcast → receiver-scan
   run on a local regtest bitcoind ([`scripts/regtest-e2e.ts`](scripts/regtest-e2e.ts);
   disposable keys/coins only, dedicated regtest-only receiver, honestly labeled
-  regtest — the signet broadcast is still faucet-blocked).
+  regtest — no funded public signet tip has been verified).
 - [`scripts/signet-e2e.ts`](scripts/signet-e2e.ts) also guards funded runs:
   `tip` refuses any tsp1 on the burned list
   ([`src/sp/burned.ts`](src/sp/burned.ts)), and `rotate` / `rotate-receiver`
@@ -138,9 +143,11 @@ signature — no trusted directory.
   filters, which didn't exist for signet at hackathon time.
 - **A published tipping identity is public.** Labels exist in the code path
   (and pass the vectors) but the UI only exposes the base address.
-- **Sender identity leaks via the UTXO set** — the sender's own input script is
-  a plain P2WPKH, so chain analysis can see *who* paid, just not *whom*. That
-  asymmetry is the point of the chain-view panel.
+- **Recipient-address reuse protection.** Payment relationships may still be
+  inferred. Sender
+  inputs, change, amounts and timing remain visible. These may support
+  inference about participants; co-spending received tips can link outputs.
+  A visible input script is not by itself proof of a person's identity.
 - Esplora (`mempool.space/signet`) and the public Nostr relays are trusted for
   *liveness*, not *correctness*: every retrieved event is signature-verified,
   and scanning is pure cryptography over raw block data — but a censoring API
