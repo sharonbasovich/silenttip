@@ -48,6 +48,23 @@ The app is deployed on GitHub Pages and was exercised live:
   That identity's mnemonic briefly appeared in an early revision of
   `public/demo.mp4` — it is permanently compromised; do not tip it.
 
+## 1c. Read-only presentation refresh — 2026-10-04
+
+The refreshed walkthrough uses the corrected deployed UI from source
+`fccbd87ffde40e4c9c58a390c568a71e00ab4cfc`. An isolated empty browser resolved
+the existing public demo npub in §2 and observed its valid signed binding.
+Receive/Tip/Scan navigation created no persisted app or session state;
+no identity generation, signing, publishing, funding, broadcast or new block
+scan was performed. The full earlier local-regtest clip in §4b is reused at
+its original speed, with a persistent local-regtest/test-coins label.
+
+- Capture workflow: https://github.com/sharonbasovich/silenttip/actions/runs/37168261464
+- Capture tooling source: `5e9d3ef6877befb3c41c7c8db3b3855924bcc659`
+- Deployed JavaScript SHA-256: `0d6bcda23314c8e510d49878179dcdbeca8a11e90f06a834be2c2104753f1db2`
+- Unchanged regtest clip SHA-256: `99a218ee837354068cc5c8989b60e97fd93c916f9c70132e2bbd0f3d335f6405`
+- The recorded derivation check is not a demonstrated spend of the output.
+- No funded public signet tip has been verified.
+
 ## 2. Nostr binding — a real, verifiable event on public relays
 
 Kind-30078 (NIP-78 parameterized replaceable) events with `d` tag
